@@ -10,6 +10,6 @@
   "author": "wassfila",
   "license": "MIT",
   "dependencies": {
-    "content-structure": "^0.1.1"
+    "content-structure": "file:../content-structure"
   }
 }
