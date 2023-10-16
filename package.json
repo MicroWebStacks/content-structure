@@ -1,6 +1,7 @@
 {
   "name": "content-structure",
-  "version": "1.0.0",
+  "type":"module",
+  "version": "0.1.1",
   "description": "Content Structure collect all your markdown files meta data and parses the Abstract Syntax Tree of each file",
   "main": "index.js",
   "scripts": {
