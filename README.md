@@ -1,6 +1,8 @@
 # content-structure
 Content Structure collect all your markdown files meta data and parses the Abstract Syntax Tree of each file
 
+! note this project is just starting and is not yet generating all planned artefacts !
+
 # usage
 ```javascript
 import {collect} from 'content-structure'
