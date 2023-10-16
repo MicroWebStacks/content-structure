@@ -1,5 +1,6 @@
 {
   "name": "content-structure-example",
+  "type":"module",
   "version": "1.0.0",
   "description": "a test example for content-structure",
   "main": "test.js",
@@ -9,6 +10,6 @@
   "author": "wassfila",
   "license": "MIT",
   "dependencies": {
-    "content-structure": "^0.1.0"
+    "content-structure": "^0.1.1"
   }
 }

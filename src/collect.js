@@ -7,6 +7,7 @@ import { md_tree, title_slug, extract_headings,
         extract_paragraphs } from './md_utils.js';
 import matter from 'gray-matter';
 import { createHash } from 'crypto';
+import { fileURLToPath } from 'url';
 
 function get_type(data){
     if(Object.hasOwn("type")){
@@ -117,7 +118,7 @@ let config = {
 
 function set_config(new_config){
     config = new_config
-    if(!config.hasOwn("rootdir")){
+    if(!Object.hasOwn(config,"rootdir")){
         const __filename = fileURLToPath(config.rooturl);
         const __dirname = dirname(__filename);
         config.rootdir = __dirname
