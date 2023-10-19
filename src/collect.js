@@ -53,6 +53,7 @@ async function get_all_md_files(){
     process.chdir(content_dir)
     const results = await glob(content_dir+"/**/*.md")
     const files = results.map((file)=>(file.split(sep).join('/')))
+    process.chdir(config.rootdir)
     return files
 }
 
