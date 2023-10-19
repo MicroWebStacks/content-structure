@@ -68,7 +68,12 @@ async function collect_documents(files_paths){
         const content_type = get_type(data)
         const uid = get_uid(slug,content_type)
         const sid = get_sid(uid)
+        const title = Object.hasOwn(data,"title")?data.title:slug
+        if(Object.hasOwn(data,"title")){
+            delete data.title
+        }
         let entry       = {
+            title:          title,
             ...data,
             path:           file_path,
             content_type:   content_type,
