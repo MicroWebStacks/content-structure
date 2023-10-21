@@ -1,5 +1,5 @@
 import {glob} from 'glob'
-import { join, sep, basename, dirname, parse } from 'path';
+import { relative, resolve, join, sep, basename, dirname, parse } from 'path';
 import {promises as fs} from 'fs';
 import { check_dir_create,save_json, get_next_uid } from './utils.js';
 import { md_tree, title_slug, extract_headings,
@@ -53,7 +53,8 @@ async function get_all_md_files(){
     console.log(`content_dir : ${content_dir}`)
     process.chdir(content_dir)
     const results = await glob(content_dir+"/**/*.md")
-    const files = results.map((file)=>(file.split(sep).join('/')))
+    //change to abs then rel to be cross os compatible
+    const files = results.map((file)=>(relative(content_dir,resolve(content_dir,file)).split(sep).join('/')))
     console.log(`change back to config.rootdir : ${config.rootdir}`)
     process.chdir(config.rootdir)
     console.log("files:")
