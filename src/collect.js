@@ -50,10 +50,14 @@ function get_sid(uid){
 
 async function get_all_md_files(){
     const content_dir = join(config.rootdir,'content');
+    console.log(`content_dir : ${content_dir}`)
     process.chdir(content_dir)
     const results = await glob(content_dir+"/**/*.md")
     const files = results.map((file)=>(file.split(sep).join('/')))
+    console.log(`change back to config.rootdir : ${config.rootdir}`)
     process.chdir(config.rootdir)
+    console.log("files:")
+    console.log(files)
     return files
 }
 
