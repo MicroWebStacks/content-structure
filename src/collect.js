@@ -118,16 +118,16 @@ async function parse_documents(content){
 }
 
 let config = {
-    rootdir: "",
-    rel_outdir: "dist"
+    rootdir: process.cwd(),
+    rel_outdir: "gen"
 }
 
 function set_config(new_config){
-    config = new_config
-    if(!Object.hasOwn(config,"rootdir")){
-        const __filename = fileURLToPath(config.rooturl);
-        const __dirname = dirname(__filename);
-        config.rootdir = __dirname
+    if(new_config != null){
+        config = new_config
+    }else{
+        console.warn("config not provided, using:")
+        console.log(config)
     }
 }
 

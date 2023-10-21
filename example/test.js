@@ -1,6 +1,8 @@
 import {collect} from 'content-structure'
+import {fileURLToPath} from 'url';
+import {dirname} from 'path'
 
 await collect({
-    rooturl:import.meta.url,
+    rootdir:dirname(fileURLToPath(import.meta.url)),
     rel_outdir:"gen"
 })
