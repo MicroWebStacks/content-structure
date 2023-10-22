@@ -7,7 +7,12 @@ import { md_tree, title_slug, extract_headings,
         extract_paragraphs } from './md_utils.js';
 import matter from 'gray-matter';
 import { createHash } from 'crypto';
-import { fileURLToPath } from 'url';
+
+let config = {
+    rootdir: process.cwd(),
+    rel_contentdir: "content",
+    rel_outdir: "gen"
+}
 
 function get_type(data){
     if(Object.hasOwn("type")){
@@ -49,7 +54,7 @@ function get_sid(uid){
 }
 
 async function get_all_md_files(){
-    const content_dir = join(config.rootdir,'content');
+    const content_dir = join(config.rootdir,config.rel_contentdir);
     console.log(`content_dir : ${content_dir}`)
     const originalDirectory = process.cwd();
     process.chdir(content_dir)
@@ -65,7 +70,7 @@ async function collect_documents(files_paths){
     let content_entries = []
     for(const file_path  of files_paths){
         const url_type = (file_path.endsWith("readme.md")?"dir":"file")
-        const abs_file_path = join(config.rootdir,"content",file_path)
+        const abs_file_path = join(config.rootdir,config.rel_contentdir,file_path)
         const text = await fs.readFile(abs_file_path,'utf-8')
         const {content, data} = matter(text)
         const slug = get_slug(data,file_path,url_type)
@@ -96,7 +101,7 @@ async function parse_documents(content){
     let all_images = []
     for(const entry of content){
         const entry_details = JSON.parse(JSON.stringify(entry))
-        const abs_file_path = join(config.rootdir,"content",entry.path)
+        const abs_file_path = join(config.rootdir,config.rel_contentdir,entry.path)
         const text = await fs.readFile(abs_file_path,'utf-8')
         const {content, data} = matter(text)
         const tree = md_tree(content)
@@ -113,17 +118,13 @@ async function parse_documents(content){
         const paragraphs = extract_paragraphs(tree,headings)
         entry_details.paragraphs = paragraphs
 
-        const dir = `gen/documents/${entry.sid}/`
+        const dir = `documents/${entry.sid}/`
+        console.log(dir)
         await check_dir_create(dir)
         await save_json(tree,dir+"tree.json")
         await save_json(entry_details,dir+"content.json")
     }
     return {all_images}
-}
-
-let config = {
-    rootdir: process.cwd(),
-    rel_outdir: "gen"
 }
 
 function set_config(new_config){

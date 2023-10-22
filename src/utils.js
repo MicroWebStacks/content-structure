@@ -52,7 +52,6 @@ function relAssetToUrl(relativepath,refFile){
 async function check_dir_create(dirname){
   const config = get_config()
   const abs_dir = join(config.rootdir,dirname)
-  console.log(abs_dir)
   try {
       await fs.access(abs_dir)
   } catch {
@@ -63,7 +62,7 @@ async function check_dir_create(dirname){
 
 async function save_json(data,file_path){
   const config = get_config()
-  const filepath = join(config.rootdir,file_path)
+  const filepath = join(config.rootdir,config.rel_outdir,file_path)
   await fs.writeFile(filepath,JSON.stringify(data,undefined, 2))
   console.log(` saved json file ${filepath}`)
 }

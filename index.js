@@ -1,6 +1,7 @@
 import { check_dir_create,save_json } from './src/utils.js';
 import {parse_documents,collect_documents,
         get_all_md_files, set_config} from './src/collect.js'
+import {join} from 'path'
 
 async function collect(config){
     set_config(config)
@@ -12,8 +13,9 @@ async function collect(config){
         images:all_images
     }
     
-    await check_dir_create("gen")
-    await save_json(content,"gen/index.json")
+    await check_dir_create(config.rel_outdir)
+    console.log("index.json")
+    await save_json(content,"index.json")
 }
 
 export{
