@@ -11,7 +11,8 @@ import { createHash } from 'crypto';
 let config = {
     rootdir: process.cwd(),
     rel_contentdir: "content",
-    rel_outdir: "gen"
+    rel_outdir: "gen",
+    debug:false
 }
 
 function get_type(data){

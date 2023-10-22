@@ -55,7 +55,9 @@ async function check_dir_create(dirname){
   try {
       await fs.access(abs_dir)
   } catch {
-    console.log("mkdir")
+    if(config.debug){
+      console.log(`mkdir : '${abs_dir}'`)
+    }
     await fs.mkdir(abs_dir, { recursive: true });
   }
 }
@@ -64,7 +66,9 @@ async function save_json(data,file_path){
   const config = get_config()
   const filepath = join(config.rootdir,config.rel_outdir,file_path)
   await fs.writeFile(filepath,JSON.stringify(data,undefined, 2))
-  console.log(` saved json file ${filepath}`)
+  if(config.debug){
+    console.log(` saved json file ${filepath}`)
+  }
 }
 
 function get_next_uid(url,uid_list){
