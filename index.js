@@ -15,7 +15,6 @@ async function collect(config){
         images:all_images
     }
     
-    await check_dir_create(config.rel_outdir)
     console.log("index.json")
     await save_json(content,"index.json")
 }

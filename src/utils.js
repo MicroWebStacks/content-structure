@@ -51,7 +51,7 @@ function relAssetToUrl(relativepath,refFile){
 
 async function check_dir_create(dirname){
   const config = get_config()
-  const abs_dir = join(config.rootdir,dirname)
+  const abs_dir = join(config.rootdir,config.rel_outdir,dirname)
   try {
       await fs.access(abs_dir)
   } catch {

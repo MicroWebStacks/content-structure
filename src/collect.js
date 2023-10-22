@@ -119,11 +119,11 @@ async function parse_documents(content){
         const paragraphs = extract_paragraphs(tree,headings)
         entry_details.paragraphs = paragraphs
 
-        const dir = `documents/${entry.sid}/`
+        const dir = join("documents",entry.sid)
         console.log(dir)
         await check_dir_create(dir)
-        await save_json(tree,dir+"tree.json")
-        await save_json(entry_details,dir+"content.json")
+        await save_json(tree,join(dir,"tree.json"))
+        await save_json(entry_details,join(dir,"content.json"))
     }
     return {all_images}
 }
@@ -131,6 +131,10 @@ async function parse_documents(content){
 function set_config(new_config){
     if(new_config != null){
         config = new_config
+        if(config.debug){
+            console.log("config:")
+            console.log(config)
+        }
     }else{
         console.warn("config not provided, using:")
         console.log(config)
