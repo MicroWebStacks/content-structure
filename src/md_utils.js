@@ -1,10 +1,22 @@
 import slugify from 'slugify'
 import { get_next_uid } from './utils.js'
 import {visit} from "unist-util-visit";
+import {visitParents} from 'unist-util-visit-parents';
+import {is} from 'unist-util-is';
 import {basename,parse} from 'path'
 import remarkDirective from 'remark-directive'
 import {remark} from 'remark'
 import remarkGfm from 'remark-gfm';
+import {join} from 'path'
+import { exists } from './utils.js';
+
+async function get_image_text(path){
+    if(!await exists(path)){
+        console.warn(`   (X) file ${path} does not exist`)
+        return ""
+    }
+    return ""
+}
 
 function heading_from_line(headings,line){
     for(let i=headings.length-1;i>=0;i--){
@@ -19,7 +31,7 @@ function node_text_list(node){
     const text_list = [];
     
     function traverse(node) {
-        if(node.type == "text"){
+        if((node.type == "text")||(node.type == "inlineCode")){
             text_list.push(node.value)
         }
         if (node.children) {
@@ -36,6 +48,14 @@ function node_text_list(node){
 function title_slug(title){
   const slug = slugify(title,{lower:true})
   return slug
+}
+
+function code_slug(node){
+    let slug = node.lang
+    if(node.meta != null){
+        slug += '-'+node.meta.split(/\s+/).join('-')
+    }
+    return slug
 }
 
 function image_slug(node){
@@ -107,36 +127,62 @@ function extract_tables(tree,headings){
     })
     return tables_list
 }
-function extract_images(tree,headings,sid){
-    let images_list = []
-    let images_slug_list = []
-    visit(tree, node=> {
-        if (node.type === 'image') {
-            const slug = image_slug(node)
-            const unique_slug = get_next_uid(slug,images_slug_list)
-            images_slug_list.push(unique_slug)
+
+async function extract_images(tree, headings,fileDir) {
+    let images_list = [];
+    let images_slug_list = [];
+
+    async function processImage(node) {
+        if (is(node, 'image')) {
+            const slug = image_slug(node);
+            const unique_slug = get_next_uid(slug, images_slug_list);
+            images_slug_list.push(unique_slug);
+            const image_text = await get_image_text(join(fileDir,node.url));
             images_list.push({
+                id: unique_slug,
+                heading: heading_from_line(headings, node.position.start.line),
+                title: node.title,
+                url: node.url,
+                alt: node.alt,
+                text: image_text,
+            });
+        }
+   }
+   await visitParents(tree, 'image', processImage);
+   return images_list;
+}
+
+function extract_code(tree,headings){
+    let code_list = []
+    let code_slug_list = []
+    visit(tree, node=> {
+        if (node.type === 'code') {
+            const slug = code_slug(node)
+            const unique_slug = get_next_uid(slug,code_slug_list)
+            code_slug_list.push(unique_slug)
+            code_list.push({
                 id:unique_slug,
                 heading:heading_from_line(headings,node.position.start.line),
-                title:node.title,
-                url:node.url,
-                alt:node.alt,
-                document:sid
+                value:node.value
             })
         }
     })
-    return images_list
-}
-function extract_code(tree,headings){
-    let result = []
-    return result
+    return code_list
 }
 
 //here we get paragraphs text only for search and returning sections 
 //but without images, tables, code content (inlineCode stays as text)
 function extract_paragraphs(tree,headings){
-    let result = []
-    return result
+    let paragraphs_list = []
+    visit(tree, node=> {
+        if (node.type === 'paragraph') {
+            paragraphs_list.push({
+                heading:heading_from_line(headings,node.position.start.line),
+                text:node_text_list(node)
+            })
+        }
+    })
+    return paragraphs_list
 }
 
 export{

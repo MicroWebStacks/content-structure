@@ -83,9 +83,19 @@ function get_next_uid(url,uid_list){
   return newUrl;
 }
 
+async function exists(filePath) {
+  try {
+    await fs.access(filePath, fs.constants.F_OK);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
 export{
     relAssetToUrl,
     check_dir_create,
     save_json,
-    get_next_uid
+    get_next_uid,
+    exists
 }

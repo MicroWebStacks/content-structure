@@ -99,7 +99,6 @@ async function collect_documents(files_paths){
 }
 
 async function parse_documents(content){
-    let all_images = []
     for(const entry of content){
         const entry_details = JSON.parse(JSON.stringify(entry))
         const abs_file_path = join(config.rootdir,config.rel_contentdir,entry.path)
@@ -111,9 +110,8 @@ async function parse_documents(content){
         entry_details.headings = headings
         const tables = extract_tables(tree,headings)
         entry_details.tables = tables
-        const images = extract_images(tree,headings,entry.sid)
+        const images = await extract_images(tree,headings,dirname(abs_file_path))
         entry_details.images = images
-        all_images.push(...images)
         const code = extract_code(tree,headings)
         entry_details.code = code
         const paragraphs = extract_paragraphs(tree,headings)
@@ -125,7 +123,7 @@ async function parse_documents(content){
         await save_json(tree,join(dir,"tree.json"))
         await save_json(entry_details,join(dir,"content.json"))
     }
-    return {all_images}
+    return
 }
 
 function set_config(new_config){

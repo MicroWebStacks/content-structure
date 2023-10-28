@@ -9,14 +9,10 @@ async function collect(config){
         console.log(files_paths)
     }
     const documents = await collect_documents(files_paths)
-    const {all_images} = await parse_documents(documents)
-    const content = {
-        documents,
-        images:all_images
-    }
-    
     console.log("index.json")
-    await save_json(content,"index.json")
+    await save_json(documents,"index.json")
+    
+    await parse_documents(documents)//generates for each document content.json,tree.json
 }
 
 export{
