@@ -1,10 +1,10 @@
-import {fromMarkdown} from 'mdast-util-from-markdown'
-import {gfmTable} from 'micromark-extension-gfm-table'
-import {gfmTableFromMarkdown} from 'mdast-util-gfm-table'
 import slugify from 'slugify'
 import { get_next_uid } from './utils.js'
 import {visit} from "unist-util-visit";
 import {basename,parse} from 'path'
+import remarkDirective from 'remark-directive'
+import {remark} from 'remark'
+import remarkGfm from 'remark-gfm';
 
 function heading_from_line(headings,line){
     for(let i=headings.length-1;i>=0;i--){
@@ -64,12 +64,12 @@ function node_text(node){
   return text_list.join(' ')
 }
 
-function md_tree(content){
-    const tree = fromMarkdown(content,{
-        extensions: [gfmTable()],
-        mdastExtensions: [gfmTableFromMarkdown()]
-    })
-    return tree
+function md_tree(content) {
+    const processor = remark()
+        .use(remarkDirective)
+        .use(remarkGfm)
+    const markdownAST = processor.parse(content);
+    return markdownAST;
 }
 
 function extract_headings(tree){

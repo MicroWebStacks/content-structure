@@ -1,4 +1,4 @@
-import { check_dir_create,save_json } from './src/utils.js';
+import { save_json } from './src/utils.js';
 import {parse_documents,collect_documents,
         get_all_md_files, set_config} from './src/collect.js'
 
