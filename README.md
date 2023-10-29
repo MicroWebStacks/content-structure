@@ -1,7 +1,7 @@
 # Content Structure
 content-structure collects all your markdown files meta data and parses the Abstract Syntax Tree of each file
 
-! note this project is just starting and is not yet generating all planned artefacts !
+! note this project is just starting and is not yet generating all planned artefacts, minor versions can still have breaking changes !
 
 # Usage
 ```shell
@@ -198,8 +198,11 @@ example of generated files for `image/readme.md` which has an sid of `78805a22`
       "text": []
     }
   ]
-}```
+}
+```
+
 and the beginning of `tree.json`
+
 ```json
 {
   "type": "root",
