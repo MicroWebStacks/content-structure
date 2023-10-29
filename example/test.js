@@ -11,3 +11,9 @@ await collect({
 
 const documents = await get_documents()
 console.log(`\nobtained ${documents.length} documents`)
+
+const authors = await get_documents({content_type:"authors"})
+console.log(`\nfound ${authors.length} authors`)
+
+const generic_markdown = await get_documents({format:"markdown",content_type:"generic"})
+console.log(`\nfound ${generic_markdown.length} generic markdown entries`)

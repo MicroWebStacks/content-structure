@@ -26,8 +26,21 @@ async function collect(config){
 
 }
 
-async function get_documents(){
-    return await load_json("index.json","output")
+function filter_documents(data,filterCriteria) {
+    return data.filter(entry => {
+        return Object.entries(filterCriteria).every(([key, value]) => {
+        return entry[key] === value;
+        });
+    });
+}
+
+async function get_documents(filter= null){
+    const documents = await load_json("index.json","output")
+    if(filter == null){
+        return documents
+    }else{
+        return filter_documents(documents,filter)
+    }
 }
 
 export{
