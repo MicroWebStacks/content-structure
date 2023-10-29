@@ -15,7 +15,7 @@ await collect()
 ```
 then use as follows
 ```javascript
-import {getDocuments} from 'content-structure'
+import {getDocuments, getEntry} from 'content-structure'
 
 const documents = await getDocuments()
 console.log(`obtained ${documents.length} documents`)
