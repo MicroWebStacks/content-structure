@@ -15,24 +15,28 @@ await collect()
 ```
 then use as follows
 ```javascript
-import {get_documents} from 'content-structure'
+import {getDocuments} from 'content-structure'
 
-const documents = await get_documents()
-console.log(`\nobtained ${documents.length} documents`)
+const documents = await getDocuments()
+console.log(`obtained ${documents.length} documents`)
 
-const authors = await get_documents({content_type:"authors"})
-console.log(`\nfound ${authors.length} authors`)
+const authors = await getDocuments({content_type:"authors"})
+console.log(`found ${authors.length} authors`)
 
-const generic_markdown = await get_documents({format:"markdown",content_type:"generic"})
-console.log(`\nfound ${generic_markdown.length} generic markdown entries`)
+const generic_markdown = await getDocuments({format:"markdown",content_type:"generic"})
+console.log(`found ${generic_markdown.length} generic markdown entries`)
+
+const image_entry = await getEntry({slug:"image"})
+const images_urls = image_entry.data.images.map(image=>image.url)
+console.log(`'image' content entry has following images '${images_urls}'`)
+
 ```
 will output
 ```shell
 obtained 14 documents
-
 found 3 authors
-
 found 11 generic markdown entries
+'image' content entry has following images './tree.svg,./long-diagram.svg'
 ```
 
 # Roadmap
@@ -58,7 +62,7 @@ The "generic" content type is the default assignment when no parent and no manua
 
 The content type, like any other field, can be filtered as follows
 ```javascript
-const authors = await get_documents({content_type:"authors"})
+const authors = await getDocuments({content_type:"authors"})
 ```
 see also the following section for an `author` content_type example.
 

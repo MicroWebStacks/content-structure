@@ -34,7 +34,7 @@ function filter_documents(data,filterCriteria) {
     });
 }
 
-async function get_documents(filter= null){
+async function getDocuments(filter= null){
     const documents = await load_json("index.json","output")
     if(filter == null){
         return documents
@@ -43,7 +43,25 @@ async function get_documents(filter= null){
     }
 }
 
+async function getEntry(filter){
+    const documents = await load_json("index.json","output")
+    const filetred_documents = filter_documents(documents,filter)
+    if(filetred_documents.length == 0){
+        console.warn(` X entry not found '${JSON.stringify(filter)}'`)
+    }else{
+        if(filetred_documents.length != 1){
+            console.warn(` X more than one document found, returning first for : '${JSON.stringify(filter)}'`)
+        }
+        const entry_data = filetred_documents[0]
+        const data = await load_json(join("documents",entry_data.sid,"content.json"),"output")
+        const tree = await load_json(join("documents",entry_data.sid,"tree.json"),"output")
+        return {tree,data}
+    }
+    return {tree:{},data:{}}
+}
+
 export{
     collect,
-    get_documents
+    getDocuments,
+    getEntry
 }
