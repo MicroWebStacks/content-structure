@@ -98,32 +98,24 @@ async function collect_documents(files_paths){
     return content_entries
 }
 
-async function parse_documents(content){
-    for(const entry of content){
-        const entry_details = JSON.parse(JSON.stringify(entry))
-        const abs_file_path = join(config.rootdir,config.rel_contentdir,entry.path)
-        const text = await fs.readFile(abs_file_path,'utf-8')
-        const {content, data} = matter(text)
-        const tree = md_tree(content)
+async function parse_document(entry){
+    const entry_details = JSON.parse(JSON.stringify(entry))
+    const abs_file_path = join(config.rootdir,config.rel_contentdir,entry.path)
+    const text = await fs.readFile(abs_file_path,'utf-8')
+    const {content, data} = matter(text)
+    const tree = md_tree(content)
 
-        const headings = extract_headings(tree)
-        entry_details.headings = headings
-        const tables = extract_tables(tree,headings)
-        entry_details.tables = tables
-        const images = await extract_images(tree,headings,dirname(abs_file_path))
-        entry_details.images = images
-        const code = extract_code(tree,headings)
-        entry_details.code = code
-        const paragraphs = extract_paragraphs(tree,headings)
-        entry_details.paragraphs = paragraphs
-
-        const dir = join("documents",entry.sid)
-        console.log(dir)
-        await check_dir_create(dir)
-        await save_json(tree,join(dir,"tree.json"))
-        await save_json(entry_details,join(dir,"content.json"))
-    }
-    return
+    const headings = extract_headings(tree)
+    entry_details.headings = headings
+    const tables = extract_tables(tree,headings)
+    entry_details.tables = tables
+    const images = await extract_images(tree,headings,dirname(abs_file_path))
+    entry_details.images = images
+    const code = extract_code(tree,headings)
+    entry_details.code = code
+    const paragraphs = extract_paragraphs(tree,headings)
+    entry_details.paragraphs = paragraphs
+    return {tree,content:entry_details}
 }
 
 function set_config(new_config){
@@ -144,7 +136,7 @@ function get_config(){
 }
 
 export{
-    parse_documents,
+    parse_document,
     collect_documents,
     get_all_md_files,
     set_config,

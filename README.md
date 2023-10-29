@@ -88,16 +88,6 @@ generates this output in the output `./gen/` folder
       "uid": "image",
       "sid": "78805a22"
     }
-  ],
-  "images": [
-    {
-      "id": "tree",
-      "heading": null,
-      "title": null,
-      "url": "./tree.svg",
-      "alt": "Tree",
-      "document": "78805a22"
-    }
   ]
 }
 ```
@@ -148,3 +138,11 @@ and the beginning of `tree.json`
             },
 ...
 ```
+
+# roadmap
+* provide an API for querying content-by-x, image-by-x, table-by-x,...
+* helper for search engine injection
+* extracting svg text and span content with jsdom
+* test hierarchical content
+* check compatibility with content-collections
+* add optional typecheck
