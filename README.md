@@ -138,6 +138,16 @@ and the beginning of `tree.json`
             },
 ...
 ```
+# description
+* content-type assignment logic
+For a hierarchically structured content, a type can be derived from the parent folder, and can in all cases be overridden by the user when defined in the meta data (markdown frontmatter or content of json or yaml)
+
+ 1. type in data         => priority for type from data
+ 2. depth > 1            => auto-type from parent folder
+ 3. root content         => generic
+
+The "generic" type is the default assignment when no parent and no manual type is provided, the genric type does not get included in the uid definition
+
 
 # roadmap
 * provide an API for querying content-by-x, image-by-x, table-by-x,...

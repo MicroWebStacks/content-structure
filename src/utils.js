@@ -1,7 +1,9 @@
 import {existsSync,copyFileSync,mkdirSync,statSync} from 'fs'
-import {promises as fs} from 'fs';
+import { readFile, writeFile, access, mkdir } from 'fs/promises';
+import { constants as fs_constants } from 'fs/promises';
 import {resolve,dirname,join,relative} from 'path'
 import {get_config} from './collect.js'
+import yaml from 'js-yaml';
 
 
 function isNewer(filepath,targetfile){
@@ -53,21 +55,12 @@ async function check_dir_create(dirname){
   const config = get_config()
   const abs_dir = join(config.rootdir,config.rel_outdir,dirname)
   try {
-      await fs.access(abs_dir)
+      await access(abs_dir)
   } catch {
     if(config.debug){
       console.log(`mkdir : '${abs_dir}'`)
     }
-    await fs.mkdir(abs_dir, { recursive: true });
-  }
-}
-
-async function save_json(data,file_path){
-  const config = get_config()
-  const filepath = join(config.rootdir,config.rel_outdir,file_path)
-  await fs.writeFile(filepath,JSON.stringify(data,undefined, 2))
-  if(config.debug){
-    console.log(` saved json file ${filepath}`)
+    await mkdir(abs_dir, { recursive: true });
   }
 }
 
@@ -85,11 +78,46 @@ function get_next_uid(url,uid_list){
 
 async function exists(filePath) {
   try {
-    await fs.access(filePath, fs.constants.F_OK);
+    await access(filePath, fs_constants.F_OK);
     return true;
   } catch (error) {
     return false;
   }
+}
+
+// => out dir
+async function save_json(data,file_path){
+  const config = get_config()
+  const filepath = join(config.rootdir,config.rel_outdir,file_path)
+  await writeFile(filepath,JSON.stringify(data,undefined, 2))
+  if(config.debug){
+    console.log(` saved json file ${filepath}`)
+  }
+}
+
+// content dir =>
+async function load_yaml(rel_path){
+  const config = get_config()
+  const path = join(config.rootdir,config.rel_contentdir,rel_path)
+  const fileContent = await readFile(path, 'utf8');
+  const data = yaml.load(fileContent);
+  return data;
+}
+
+// content dir =>
+async function load_json(rel_path,dir="content"){
+  const config = get_config()
+  const rel_folder = (dir=="content")?config.rel_contentdir:config.rel_outdir
+  const path = join(config.rootdir,rel_folder,rel_path)
+  const text = await readFile(path,'utf-8')
+  return JSON.parse(text)
+}
+
+async function load_text(rel_path){
+  const config = get_config()
+  const path = join(config.rootdir,config.rel_contentdir,rel_path)
+  const text = await readFile(path,'utf-8')
+  return text
 }
 
 export{
@@ -97,5 +125,8 @@ export{
     check_dir_create,
     save_json,
     get_next_uid,
-    exists
+    exists,
+    load_yaml,
+    load_json,
+    load_text
 }
