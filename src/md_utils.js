@@ -51,7 +51,6 @@ function node_text_list(node){
             const directive_text = `${node.name}(${vars_val})`
             text_list.push(directive_text)
         }
-        //TODO in case you add a ref tag node
         if (node.children) {
             for (const child of node.children) {
                 traverse(child);
