@@ -30,7 +30,7 @@ dependencies:
     specifier: ^1.6.6
     version: 1.6.6
   unified:
-    specifier: ^11.0.3
+    specifier: ^11.0.4
     version: 11.0.4
   unist-util-visit:
     specifier: ^5.0.0

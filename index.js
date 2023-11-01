@@ -17,7 +17,7 @@ async function collect(config){
         if(entry.format == "markdown"){
             const {tree,content} = await parse_document(entry)
             const dir = join("documents",entry.sid)
-            console.log(dir)
+            console.log(entry.path)
             await check_dir_create(dir)
             await save_json(tree,join(dir,"tree.json"))
             await save_json(content,join(dir,"content.json"))

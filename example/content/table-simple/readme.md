@@ -15,3 +15,4 @@ This is a table with heading and description
 | Row 1    | Row 1 c2    |
 | Row 2    | Row 2 c2   |
 
+page::image

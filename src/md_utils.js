@@ -142,10 +142,8 @@ function extract_tables(tree,headings){
 async function extract_images(tree, headings,fileDir) {
     let images_list = [];
     let images_slug_list = [];
-    console.log(" - check image")
     async function processImage(node) {
         if (is(node, 'image')) {
-            console.log(" ---> image")
             const slug = image_slug(node);
             const unique_slug = get_next_uid(slug, images_slug_list);
             images_slug_list.push(unique_slug);
@@ -197,6 +195,33 @@ function extract_paragraphs(tree,headings){
     return paragraphs_list
 }
 
+function tag_match_page(node) {
+    const regex = /page::(\w+)/g;
+    const matches = Array.from(node.value.matchAll(regex));
+    const results = []
+    if (matches.length > 0) {
+        console.log(` tag match in '${node.value}'`)
+        for (const match of matches) {
+            results.push(match[1])
+        }
+    }
+    return results
+}
+
+function extract_tags(tree,headings){
+    let refs_list = []
+    visit(tree, 'text',node=> {
+        const refs = tag_match_page(node)
+        if(refs.length > 0){
+            refs_list.push({
+                heading:heading_from_line(headings,node.position.start.line),
+                pages:refs
+            })
+        }
+    })
+    return refs_list
+}
+
 export{
     md_tree,
     extract_headings,
@@ -207,5 +232,6 @@ export{
     node_text_list,
     node_slug,
     title_slug,
-    node_text
+    node_text,
+    extract_tags
 }

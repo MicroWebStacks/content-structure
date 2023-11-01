@@ -19,3 +19,5 @@ an introduction to the table
 
 detailed description of the table `function()` with interleaved inlineCode
 
+Link to page::image
+

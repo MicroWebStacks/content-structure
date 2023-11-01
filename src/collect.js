@@ -4,7 +4,7 @@ import path from 'path';
 import { get_next_uid, load_yaml, load_json, load_text } from './utils.js';
 import { md_tree, title_slug, extract_headings,
         extract_tables,extract_images,extract_code,
-        extract_paragraphs } from './md_utils.js';
+        extract_paragraphs, extract_tags } from './md_utils.js';
 import matter from 'gray-matter';
 import { createHash } from 'crypto';
 
@@ -171,6 +171,9 @@ async function parse_document(entry){
     entry_details.code = code
     const paragraphs = extract_paragraphs(tree,headings)
     entry_details.paragraphs = paragraphs
+    const refs = extract_tags(tree,headings)
+    entry_details.references = refs
+
     return {tree,content:entry_details}
 }
 

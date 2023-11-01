@@ -92,9 +92,9 @@ async function save_json(data,file_path){
   const config = get_config()
   const filepath = join(config.rootdir,config.rel_outdir,file_path)
   await writeFile(filepath,JSON.stringify(data,undefined, 2))
-  if(config.debug){
-    console.log(` saved json file ${filepath}`)
-  }
+  //if(config.debug){
+  //  console.log(` saved json file ${filepath}`)
+  //}
 }
 
 // content dir =>
