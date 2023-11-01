@@ -17,7 +17,7 @@ function remarkTags(tree) {
                 if(match.index > current_index){
                     new_nodes.push({
                         type:"text",
-                        value:node.value.substring(0,match.index),
+                        value:node.value.substring(current_index,match.index),
                         position:{start:{line:node.position.start.line}}
                     })
                 }
