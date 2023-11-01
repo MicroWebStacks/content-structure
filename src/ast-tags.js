@@ -18,6 +18,8 @@ function remarkTags(tree) {
                     new_nodes.push({
                         type:"text",
                         value:node.value.substring(current_index,match.index),
+                        //known limitation using parent line which should count nb \n
+                        //this limitation does not interfere with the usage for paragraphs identification
                         position:{start:{line:node.position.start.line}}
                     })
                 }

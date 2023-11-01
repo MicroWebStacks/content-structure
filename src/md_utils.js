@@ -202,31 +202,16 @@ function extract_paragraphs(tree,headings){
     return paragraphs_list
 }
 
-function tag_match_page(node) {
-    const regex = /page::(\w+)/g;
-    const matches = Array.from(node.value.matchAll(regex));
-    const results = []
-    if (matches.length > 0) {
-        console.log(` tag match in '${node.value}'`)
-        for (const match of matches) {
-            results.push(match[1])
-        }
-    }
-    return results
-}
-
 function extract_tags(tree,headings){
-    let refs_list = []
-    visit(tree, 'text',node=> {
-        const refs = tag_match_page(node)
-        if(refs.length > 0){
-            refs_list.push({
-                heading:heading_from_line(headings,node.position.start.line),
-                pages:refs
-            })
-        }
+    let tags_list = []
+    visit(tree, 'tag',node=> {
+        tags_list.push({
+            heading:heading_from_line(headings,node.position.start.line),
+            type:node.tag_type,
+            value:node.tag_value
+        })
     })
-    return refs_list
+    return tags_list
 }
 
 export{

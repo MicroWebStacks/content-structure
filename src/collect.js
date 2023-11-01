@@ -171,8 +171,8 @@ async function parse_document(entry){
     entry_details.code = code
     const paragraphs = extract_paragraphs(tree,headings)
     entry_details.paragraphs = paragraphs
-    const refs = extract_tags(tree,headings)
-    entry_details.references = refs
+    const tags = extract_tags(tree,headings)
+    entry_details.tags = tags
 
     return {tree,content:entry_details}
 }
