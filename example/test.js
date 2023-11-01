@@ -6,7 +6,10 @@ await collect({
     rootdir:dirname(fileURLToPath(import.meta.url)),
     rel_contentdir:"content",
     rel_outdir:"gen",
-    debug:true
+    debug:true,
+    tags:{
+        page:'page::(\\w+)'
+    }
 })
 
 const documents = await getDocuments()

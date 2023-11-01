@@ -1,14 +1,13 @@
 import { visit } from 'unist-util-visit';
 
-function remarkTags(tree) {
+function remarkTags(tree,tags) {
     visit(tree,'text',(node, index, parent)=>{
         if (node.children) {
             node.children = node.children.map(visitNode);
         }
         if (node.type === 'text') {
-            console.log(node.value)
             let new_nodes = []
-            const regex = /page::(\w+)/g;
+            const regex = new RegExp(tags.page, 'g');
             const matches = node.value.matchAll(regex);
             let hasMatches = false;
             let current_index = 0

@@ -42,7 +42,7 @@ found 11 generic markdown entries
 # Roadmap
 - [x] provide an API for querying documents content-by-x
 - [x] extracting svg text and span content with jsdom
-- [ ] replace references with a ref node
+- [x] replace tags with a tag node
 - [ ] test hierarchical content
 - [ ] test combined content e.g. code inside table, image inside table
 - [ ] provide an API for querying image-by-x, table-by-x,...

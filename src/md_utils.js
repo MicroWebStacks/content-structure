@@ -11,6 +11,7 @@ import {remarkTags} from './ast-tags.js'
 import {join} from 'path'
 import { exists } from './utils.js';
 import { JSDOM } from 'jsdom';
+import { get_config } from './collect.js';
 
 async function get_image_text(path){
     if(!await exists(path)){
@@ -106,7 +107,8 @@ function md_tree(content) {
         .use(remarkDirective)
         .use(remarkGfm)
     const markdownAST = processor.parse(content);
-    const new_markdownAST = remarkTags(markdownAST)
+
+    const new_markdownAST = remarkTags(markdownAST,get_config().tags)
     return new_markdownAST;
 }
 
