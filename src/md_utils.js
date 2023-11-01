@@ -4,9 +4,10 @@ import {visit} from "unist-util-visit";
 import {visitParents} from 'unist-util-visit-parents';
 import {is} from 'unist-util-is';
 import {basename,parse} from 'path'
-import remarkDirective from 'remark-directive'
 import {remark} from 'remark'
+import remarkDirective from 'remark-directive'
 import remarkGfm from 'remark-gfm';
+import {remarkTags} from './ast-tags.js'
 import {join} from 'path'
 import { exists } from './utils.js';
 import { JSDOM } from 'jsdom';
@@ -45,6 +46,12 @@ function node_text_list(node){
         if((node.type == "text")||(node.type == "inlineCode")){
             text_list.push(node.value)
         }
+        if(node.type == "textDirective"){
+            const vars_val = Object.values(node.attributes).join(',')
+            const directive_text = `${node.name}(${vars_val})`
+            text_list.push(directive_text)
+        }
+        //TODO in case you add a ref tag node
         if (node.children) {
             for (const child of node.children) {
                 traverse(child);
@@ -100,7 +107,8 @@ function md_tree(content) {
         .use(remarkDirective)
         .use(remarkGfm)
     const markdownAST = processor.parse(content);
-    return markdownAST;
+    const new_markdownAST = remarkTags(markdownAST)
+    return new_markdownAST;
 }
 
 function extract_headings(tree){
