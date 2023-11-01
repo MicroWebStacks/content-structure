@@ -17,13 +17,18 @@ function remarkTags(tree) {
                 if(match.index > current_index){
                     new_nodes.push({
                         type:"text",
-                        value:node.value.substring(0,match.index)
+                        value:node.value.substring(0,match.index),
+                        position:{start:{line:node.position.start.line}}
                     })
                 }
                 new_nodes.push({
                     type:"tag",
-                    page:match[1],
-                    children:[{type:"text",value:match[0]}]
+                    tag_type:"page",
+                    tag_value:match[1],
+                    position:{start:{line:node.position.start.line}},
+                    children:[{type:"text",value:match[1],
+                                position:{start:{line:node.position.start.line}},
+                            }]
                 })
                 current_index = match.index + match[0].length
             }
@@ -31,10 +36,12 @@ function remarkTags(tree) {
                 if(current_index < node.value.length){
                     new_nodes.push({
                         type:"text",
-                        value:node.value.substring(current_index,node.value.length)
+                        value:node.value.substring(current_index,node.value.length),
+                        position:{start:{line:node.position.start.line}}
                     })
                 }
-                console.log(JSON.stringify(new_nodes))
+                //console.log(JSON.stringify(new_nodes))
+                parent.children.splice(index, 1, ...new_nodes);
             }
         }
         return node;
