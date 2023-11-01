@@ -165,8 +165,7 @@ async function parse_document(entry){
     entry_details.headings = headings
     const tables = extract_tables(tree,headings)
     entry_details.tables = tables
-    const abs_dir_path = dirname(join(config.rootdir,config.rel_contentdir,entry.path))
-    const images = await extract_images(tree,headings,abs_dir_path)
+    const images = await extract_images(tree,headings,dirname(entry.path))
     entry_details.images = images
     const code = extract_code(tree,headings)
     entry_details.code = code

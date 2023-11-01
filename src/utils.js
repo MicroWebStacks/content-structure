@@ -76,9 +76,11 @@ function get_next_uid(url,uid_list){
   return newUrl;
 }
 
-async function exists(filePath) {
+async function exists(rel_path) {
+  const config = get_config()
+  const path = join(config.rootdir,config.rel_contentdir,rel_path)
   try {
-    await access(filePath, fs_constants.F_OK);
+    await access(path, fs_constants.F_OK);
     return true;
   } catch (error) {
     return false;

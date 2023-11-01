@@ -1,5 +1,5 @@
 import slugify from 'slugify'
-import { get_next_uid } from './utils.js'
+import { get_next_uid,load_text } from './utils.js'
 import {visit} from "unist-util-visit";
 import {visitParents} from 'unist-util-visit-parents';
 import {is} from 'unist-util-is';
@@ -9,13 +9,24 @@ import {remark} from 'remark'
 import remarkGfm from 'remark-gfm';
 import {join} from 'path'
 import { exists } from './utils.js';
+import { JSDOM } from 'jsdom';
 
 async function get_image_text(path){
     if(!await exists(path)){
         console.warn(`   (X) file ${path} does not exist`)
         return ""
     }
-    return ""
+
+    const svgText = await load_text(path)
+
+    const dom = new JSDOM(svgText, { contentType: 'image/svg+xml' });
+    const textElements = dom.window.document.querySelectorAll('text');
+    let result = [];
+    textElements.forEach(textElement => {
+        result.push(textElement.textContent)
+    });
+    console.log(`   * found ${result.length} text entries in SVG`)
+    return result
 }
 
 function heading_from_line(headings,line){
@@ -131,9 +142,10 @@ function extract_tables(tree,headings){
 async function extract_images(tree, headings,fileDir) {
     let images_list = [];
     let images_slug_list = [];
-
+    console.log(" - check image")
     async function processImage(node) {
         if (is(node, 'image')) {
+            console.log(" ---> image")
             const slug = image_slug(node);
             const unique_slug = get_next_uid(slug, images_slug_list);
             images_slug_list.push(unique_slug);

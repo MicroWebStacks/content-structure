@@ -41,9 +41,9 @@ found 11 generic markdown entries
 
 # Roadmap
 - [x] provide an API for querying documents content-by-x
+- [x] extracting svg text and span content with jsdom
 - [ ] provide an API for querying image-by-x, table-by-x,...
 - [ ] helper for search engine injection
-- [ ] extracting svg text and span content with jsdom
 - [ ] test hierarchical content
 - [ ] check compatibility with content-collections
 - [ ] add optional typecheck
