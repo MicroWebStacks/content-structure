@@ -50,6 +50,8 @@ found 11 generic markdown entries
 - [ ] check compatibility with content-collections
 - [ ] add optional typecheck
 
+## ideas
+* parse other images types for text extraction
 
 # Documentation
 ## Documents fields description

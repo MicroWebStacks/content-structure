@@ -18,7 +18,9 @@ async function get_image_text(path){
         console.warn(`   (X) file ${path} does not exist`)
         return ""
     }
-
+    if(!path.endsWith(".svg")){//only SVG supported for now
+        return ""
+    }
     const svgText = await load_text(path)
 
     const dom = new JSDOM(svgText, { contentType: 'image/svg+xml' });
