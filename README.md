@@ -43,6 +43,7 @@ found 11 generic markdown entries
 - [x] provide an API for querying documents content-by-x
 - [x] extracting svg text and span content with jsdom
 - [x] replace tags with a tag node
+- [ ] files with same name as folder count as folder type
 - [ ] test hierarchical content
 - [ ] test combined content e.g. code inside table, image inside table
 - [ ] provide an API for querying image-by-x, table-by-x,...

@@ -11,6 +11,7 @@ async function collect(config){
     }
     const documents = await collect_documents_data(files_paths)
     console.log("index.json")
+    await check_dir_create("")//even root dir might need creation
     await save_json(documents,"index.json")
 
     for(const entry of documents){
