@@ -64,5 +64,6 @@ async function getEntry(filter){
 export{
     collect,
     getDocuments,
-    getEntry
+    getEntry,
+    set_config
 }
