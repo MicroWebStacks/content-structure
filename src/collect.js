@@ -84,6 +84,16 @@ async function get_all_files(ext_list){
     return files
 }
 
+function entry_to_url(url_type,path,slug){
+    if(url_type == "dir"){
+        const dir = dirname(dirname(path))
+        return join(dir, slug).replaceAll('\\','/')
+    }else{
+        const parsedPath = parse(path)
+        return join(parsedPath.dir, slug).replaceAll('\\','/')
+    }
+}
+
 async function get_markdown_data(file_path){
     const url_type = (file_path.endsWith("readme.md")?"dir":"file")
     const text = await load_text(file_path)
@@ -97,10 +107,12 @@ async function get_markdown_data(file_path){
     if(Object.hasOwn(data,"title")){
         delete data.title
     }
+    const url = entry_to_url(url_type,file_path,slug)
     let entry       = {
         sid:            sid,         //short unique id
         uid:            uid,        //unique, fallback appending -1, -2,...
         path:           file_path,
+        url:            url,
         url_type:       url_type,
         slug:           slug,       //not unique
         format:         "markdown",
@@ -126,10 +138,12 @@ async function get_data(file_path){
     const content_type = get_type(data,file_path,url_type)
     const uid = get_uid(slug,content_type)
     const sid = get_sid(uid)
+    const url = entry_to_url(url_type,file_path,slug)
     let entry       = {
         sid:            sid,         //short unique id
         uid:            uid,        //unique, fallback appending -1, -2,...
         path:           file_path,
+        url:            url,
         url_type:       url_type,
         slug:           slug,       //not unique
         format:         "data",
