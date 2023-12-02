@@ -168,6 +168,26 @@ async function collect_documents_data(files_paths){
     return content_entries
 }
 
+async function parse_markdown(markdown){
+    const entry_details = {}
+    const tree = md_tree(markdown)
+    
+    const headings = extract_headings(tree)
+    entry_details.headings = headings
+    const tables = extract_tables(tree,headings)
+    entry_details.tables = tables
+    const images = await extract_images(tree,headings,dirname(entry.path))
+    entry_details.images = images
+    const code = extract_code(tree,headings)
+    entry_details.code = code
+    const paragraphs = extract_paragraphs(tree,headings)
+    entry_details.paragraphs = paragraphs
+    const tags = extract_tags(tree,headings)
+    entry_details.tags = tags
+
+    return {tree,content:entry_details}
+}
+
 async function parse_document(entry){
     const entry_details = JSON.parse(JSON.stringify(entry))
     const text = await load_text(entry.path)
@@ -213,5 +233,6 @@ export{
     collect_documents_data,
     get_all_files,
     set_config,
-    get_config
+    get_config,
+    parse_markdown
 }

@@ -1,7 +1,7 @@
 import {join} from 'path'
 import { save_json,load_json,check_dir_create } from './src/utils.js';
 import {parse_document,collect_documents_data,
-        get_all_files, set_config} from './src/collect.js'
+        get_all_files, set_config,parse_markdown} from './src/collect.js'
 
 async function collect(config){
     set_config(config)
@@ -65,5 +65,6 @@ export{
     collect,
     getDocuments,
     getEntry,
-    set_config
+    set_config,
+    parse_markdown
 }
