@@ -169,7 +169,7 @@ async function collect_documents_data(files_paths){
 }
 
 async function parse_markdown(markdown,path){
-    const entry_details = {}
+    const entry_details = {path:path}
     const tree = md_tree(markdown)
     
     const headings = extract_headings(tree)
