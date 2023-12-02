@@ -168,7 +168,7 @@ async function collect_documents_data(files_paths){
     return content_entries
 }
 
-async function parse_markdown(markdown){
+async function parse_markdown(markdown,path){
     const entry_details = {}
     const tree = md_tree(markdown)
     
@@ -176,7 +176,7 @@ async function parse_markdown(markdown){
     entry_details.headings = headings
     const tables = extract_tables(tree,headings)
     entry_details.tables = tables
-    const images = await extract_images(tree,headings,dirname(entry.path))
+    const images = await extract_images(tree,headings,dirname(path))
     entry_details.images = images
     const code = extract_code(tree,headings)
     entry_details.code = code
