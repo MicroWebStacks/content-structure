@@ -1,9 +1,7 @@
 import slugify from 'slugify'
 import { get_next_uid,load_text } from './utils.js'
 import {visit} from "unist-util-visit";
-import {visitParents} from 'unist-util-visit-parents';
-import {is} from 'unist-util-is';
-import {basename,parse} from 'path'
+import {dirname, basename,parse} from 'path'
 import {remark} from 'remark'
 import remarkDirective from 'remark-directive'
 import remarkGfm from 'remark-gfm';
@@ -11,7 +9,7 @@ import {remarkTags} from './ast-tags.js'
 import {join} from 'path'
 import { exists } from './utils.js';
 import { JSDOM } from 'jsdom';
-import { get_config } from './collect.js';
+import { get_config,shortMD5 } from './collect.js';
 
 async function get_image_text(path){
     if(!await exists(path)){
@@ -150,27 +148,44 @@ function extract_tables(tree,headings){
     return tables_list
 }
 
-async function extract_images(tree, headings,fileDir) {
+async function extract_images(tree, headings,entry) {
+    const fileDir = dirname(entry.path)
     let images_list = [];
     let images_slug_list = [];
     async function processImage(node) {
-        if (is(node, 'image')) {
             const slug = image_slug(node);
             const unique_slug = get_next_uid(slug, images_slug_list);
             images_slug_list.push(unique_slug);
             const image_text = await get_image_text(join(fileDir,node.url));
+            const uid = `${entry.uid}#${unique_slug}`
             images_list.push({
                 id: unique_slug,
+                uid:uid,
+                sid:shortMD5(uid),
                 heading: heading_from_line(headings, node.position.start.line),
                 title: node.title,
                 url: node.url,
                 alt: node.alt,
                 text: image_text,
-            });
-        }
+            })
    }
-   await visitParents(tree, 'image', processImage);
+   visit(tree, 'image', processImage);
    return images_list;
+}
+
+function get_images_info(entry,content){
+    const images = []
+    if(content.images.length > 0){
+        for(const image of content.images){
+            images.push({
+                uid:image.uid,
+                sid:image.sid,
+                document:entry.sid,
+                path:join(dirname(entry.path),image.url)
+            })
+        }
+    }
+    return images
 }
 
 function extract_code(tree,headings){
@@ -183,12 +198,30 @@ function extract_code(tree,headings){
             code_slug_list.push(unique_slug)
             code_list.push({
                 id:unique_slug,
+                language:node.lang?node.lang:"code",
                 heading:heading_from_line(headings,node.position.start.line),
                 value:node.value
             })
         }
     })
     return code_list
+}
+
+function get_codes_info(entry,content){
+    const codes = []    
+    if(content.code.length > 0){
+        for(const code of content.code){
+            const uid = `${entry.uid}#${code.id}`
+            codes.push({
+                uid:uid,
+                sid:shortMD5(uid),
+                hash:shortMD5(code.value),
+                document:entry.sid,
+                language:code.language
+            })
+        }
+    }
+    return codes
 }
 
 //here we get paragraphs text only for search and returning sections 
@@ -229,5 +262,7 @@ export{
     node_slug,
     title_slug,
     node_text,
-    extract_tags
+    extract_tags,
+    get_images_info,
+    get_codes_info
 }

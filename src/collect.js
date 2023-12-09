@@ -64,12 +64,12 @@ function get_uid(slug,type){
     return uid
 }
 
-function get_sid(uid){
-    const hash = createHash('md5')
-    hash.update(uid)
-    return hash.digest('hex').slice(0,8)
+function shortMD5(text) {
+    const hash = createHash('md5').update(text, 'utf8').digest('hex');
+    return hash.substring(0, 8);
 }
-
+  
+  
 async function get_all_files(ext_list){
     const content_dir = join(config.rootdir,config.rel_contentdir);
     console.log(`content_dir : ${content_dir}`)
@@ -102,7 +102,7 @@ async function get_markdown_data(file_path){
     const slug = get_slug(data,file_path,url_type)
     const content_type = get_type(data,file_path,url_type)
     const uid = get_uid(slug,content_type)
-    const sid = get_sid(uid)
+    const sid = shortMD5(uid)
     const title = Object.hasOwn(data,"title")?data.title:slug
     if(Object.hasOwn(data,"title")){
         delete data.title
@@ -137,7 +137,7 @@ async function get_data(file_path){
     const slug = get_slug(data,file_path,url_type)
     const content_type = get_type(data,file_path,url_type)
     const uid = get_uid(slug,content_type)
-    const sid = get_sid(uid)
+    const sid = shortMD5(uid)
     const url = entry_to_url(url_type,file_path,slug)
     let entry       = {
         sid:            sid,         //short unique id
@@ -199,7 +199,7 @@ async function parse_document(entry){
     entry_details.headings = headings
     const tables = extract_tables(tree,headings)
     entry_details.tables = tables
-    const images = await extract_images(tree,headings,dirname(entry.path))
+    const images = await extract_images(tree,headings,entry)
     entry_details.images = images
     const code = extract_code(tree,headings)
     entry_details.code = code
@@ -234,5 +234,6 @@ export{
     get_all_files,
     set_config,
     get_config,
-    parse_markdown
+    parse_markdown,
+    shortMD5
 }
