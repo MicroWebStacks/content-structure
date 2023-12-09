@@ -76,7 +76,12 @@ async function get_all_files(ext_list){
     const originalDirectory = process.cwd();
     process.chdir(content_dir)
     const filter = ext_list.map((ext)=>`*.${ext}`).join(",")
-    const results = await glob(content_dir+`/**/{${filter}}`)
+    console.log(filter)
+    let glob_query = content_dir+`/**/{${filter}}`
+    if(ext_list.length == 1){
+        glob_query = content_dir+`/**/${filter}`
+    }
+    const results = await glob(glob_query)
     //change to abs then rel to be cross os compatible
     const files = results.map((file)=>(relative(content_dir,resolve(content_dir,file)).split(sep).join('/')))
     console.log(`change back to originalDirectory : ${originalDirectory}`)
