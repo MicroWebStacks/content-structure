@@ -1,12 +1,13 @@
 import {join} from 'path'
 import { save_json,load_json,check_dir_create } from './src/utils.js';
-import {get_images_info,get_codes_info} from './src/md_utils.js'
+import {get_images_info,get_codes_info,get_links_info} from './src/md_utils.js'
 import {parse_document,collect_documents_data,
-        get_all_files, set_config,parse_markdown} from './src/collect.js'
+        get_all_files, set_config,parse_markdown,
+        check_add_assets} from './src/collect.js'
 
 async function collect(config){
     set_config(config)
-    const files_paths = await get_all_files(config.extensions)
+    const files_paths = await get_all_files(config.content_ext)
     if(config.debug){
         console.log(files_paths)
     }
@@ -15,8 +16,7 @@ async function collect(config){
     await check_dir_create("")//even root dir might need creation
     await save_json(documents,"document_list.json")
 
-    const image_list = []
-    const code_list = []
+    const asset_list = []
     for(const entry of documents){
         if(entry.format == "markdown"){
             const {tree,content} = await parse_document(entry)
@@ -25,12 +25,14 @@ async function collect(config){
             await check_dir_create(dir)
             await save_json(tree,join(dir,"tree.json"))
             await save_json(content,join(dir,"content.json"))
-            image_list.push(...get_images_info(entry,content))
-            code_list.push(...get_codes_info(entry,content))
+            asset_list.push(...get_images_info(entry,content))
+            asset_list.push(...get_codes_info(entry,content))
+            asset_list.push(...get_links_info(entry,content))
         }
     }
-    await save_json(image_list,"image_list.json")
-    await save_json(code_list,"code_list.json")
+    const content_assets = await get_all_files(config.assets_ext)
+    await check_add_assets(asset_list,content_assets)
+    await save_json(asset_list,"asset_list.json")
 }
 
 function filter_documents(data,filterCriteria) {

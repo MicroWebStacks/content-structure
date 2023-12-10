@@ -1,12 +1,13 @@
 import {glob} from 'glob'
 import { relative, resolve, join, sep, basename, dirname, parse, extname } from 'path';
 import path from 'path';
-import { get_next_uid, load_yaml, load_json, load_text } from './utils.js';
+import { get_next_uid, load_yaml, load_json, load_text,exists } from './utils.js';
 import { md_tree, title_slug, extract_headings,
         extract_tables,extract_images,extract_code,
-        extract_paragraphs, extract_tags } from './md_utils.js';
+        extract_paragraphs, extract_links,extract_tags } from './md_utils.js';
 import matter from 'gray-matter';
 import { createHash } from 'crypto';
+import {warn} from './libs/log.js'
 
 
 let config = {
@@ -187,6 +188,8 @@ async function parse_markdown(markdown,path){
     entry_details.code = code
     const paragraphs = extract_paragraphs(tree,headings)
     entry_details.paragraphs = paragraphs
+    const links = extract_links(tree,headings)
+    entry_details.links = links
     const tags = extract_tags(tree,headings)
     entry_details.tags = tags
 
@@ -210,10 +213,35 @@ async function parse_document(entry){
     entry_details.code = code
     const paragraphs = extract_paragraphs(tree,headings)
     entry_details.paragraphs = paragraphs
+    const links = extract_links(tree,headings)
+    entry_details.links = links
     const tags = extract_tags(tree,headings)
     entry_details.tags = tags
 
     return {tree,content:entry_details}
+}
+
+async function check_add_assets(asset_list,content_assets){
+    const referenced_locals = new Set()
+    for(const asset of asset_list){
+        if(Object.hasOwn(asset,"path")){
+            referenced_locals.add(asset.path)
+            if(!await exists(asset.path)){
+                warn(`(X) asset does not exist '${asset.path}'`)
+            }
+        }
+    }
+    for(const filepath of content_assets){
+        if(!referenced_locals.has(filepath)){
+            const uid = filepath.replaceAll("/",".")
+            asset_list.push({
+                type:"found",
+                uid:uid,
+                sid:shortMD5(uid),
+                path:filepath
+            })
+        }
+    }
 }
 
 function set_config(new_config){
@@ -224,7 +252,7 @@ function set_config(new_config){
             console.log(config)
         }
     }else{
-        console.warn("config not provided, using:")
+        warn("config not provided, using:")
         console.log(config)
     }
 }
@@ -237,6 +265,7 @@ export{
     parse_document,
     collect_documents_data,
     get_all_files,
+    check_add_assets,
     set_config,
     get_config,
     parse_markdown,

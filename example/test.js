@@ -5,7 +5,8 @@ import {dirname} from 'path'
 await collect({
     rootdir:dirname(fileURLToPath(import.meta.url)),
     rel_contentdir:"content",
-    extensions:["md","json","yml","yaml"],
+    content_ext:["md","json","yml","yaml"],
+    assets_ext:["svg","webp","png","jpeg","jpg","xlsx","glb"],
     rel_outdir:"gen",
     debug:true,
     tags:{

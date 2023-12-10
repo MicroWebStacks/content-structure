@@ -88,6 +88,13 @@ function image_slug(node){
     
 }
 
+function link_slug(node,text){
+    if(node.title !== null){
+        return slugify(node.title,{lower:true})
+    }
+    return slugify(text)
+}
+
 function node_slug(node){
     let text_list = node_text_list(node);
     text_list = text_list.map((text)=>(text.trim()))
@@ -177,11 +184,13 @@ function get_images_info(entry,content){
     const images = []
     if(content.images.length > 0){
         for(const image of content.images){
+            const path = join(dirname(entry.path),image.url).replaceAll('\\','/')
             images.push({
+                type:"image",
                 uid:image.uid,
                 sid:image.sid,
                 document:entry.sid,
-                path:join(dirname(entry.path),image.url)
+                path:path
             })
         }
     }
@@ -213,6 +222,7 @@ function get_codes_info(entry,content){
         for(const code of content.code){
             const uid = `${entry.uid}#${code.id}`
             codes.push({
+                type:"code",
                 uid:uid,
                 sid:shortMD5(uid),
                 hash:shortMD5(code.value),
@@ -228,15 +238,57 @@ function get_codes_info(entry,content){
 //but without images, tables, code content (inlineCode stays as text)
 function extract_paragraphs(tree,headings){
     let paragraphs_list = []
-    visit(tree, node=> {
-        if (node.type === 'paragraph') {
-            paragraphs_list.push({
-                heading:heading_from_line(headings,node.position.start.line),
-                text:node_text_list(node)
-            })
-        }
+    visit(tree, "paragraph", node=> {
+        paragraphs_list.push({
+            heading:heading_from_line(headings,node.position.start.line),
+            text:node_text_list(node)
+        })
     })
     return paragraphs_list
+}
+
+function extract_links(tree,headings){
+    let links_list = []
+    let slug_list = [];
+    visit(tree, "link", node=> {
+        const text = node_text_list(node).join(" ")
+        const slug = link_slug(node,text)
+        const unique_slug = get_next_uid(slug, slug_list);
+        links_list.push({
+            id:unique_slug,
+            heading:heading_from_line(headings,node.position.start.line),
+            url: node.url,
+            title: node.title,
+            text: text
+        })
+    })
+    return links_list
+}
+
+function get_links_info(entry,content){
+    const links = []    
+    if(content.links.length > 0){
+        for(const link of content.links){
+            const external = link.url.startsWith('http')
+            const uid = `${entry.uid}#${link.id}`
+            let newlink = {
+                type:"link",
+                uid:uid,
+                sid:shortMD5(uid),
+                text:link.text,
+                document:entry.sid,
+                external:external
+            }
+            if(external){
+                newlink.url = link.url
+            }else{
+                const path = join(dirname(entry.path),link.url).replaceAll('\\','/')
+                newlink.path = path
+            }
+            links.push(newlink)
+        }
+    }
+    return links
 }
 
 function extract_tags(tree,headings){
@@ -258,11 +310,13 @@ export{
     extract_images,
     extract_code,
     extract_paragraphs,
+    extract_links,
     node_text_list,
     node_slug,
     title_slug,
     node_text,
     extract_tags,
     get_images_info,
-    get_codes_info
+    get_codes_info,
+    get_links_info
 }
