@@ -221,16 +221,13 @@ async function parse_document(entry){
     return {tree,content:entry_details}
 }
 
-async function check_add_assets(asset_list,content_assets,assets_ext){
+async function check_add_assets(asset_list,content_assets){
     const referenced_locals = new Set()
     for(const asset of asset_list){
         if(Object.hasOwn(asset,"path")){
-            const ext = extname(asset.path).substring(0,1)
-            if(ext in assets_ext){
-                referenced_locals.add(asset.path)
-                if(!await exists(asset.path)){
-                    warn(`(X) asset does not exist '${asset.path}'`)
-                }
+            referenced_locals.add(asset.path)
+            if(!await exists(asset.path)){
+                warn(`(X) asset does not exist '${asset.path}'`)
             }
         }
     }

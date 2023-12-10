@@ -1,7 +1,7 @@
 import slugify from 'slugify'
 import { get_next_uid,load_text } from './utils.js'
 import {visit} from "unist-util-visit";
-import {dirname, basename,parse} from 'path'
+import {dirname, basename,parse, extname} from 'path'
 import {remark} from 'remark'
 import remarkDirective from 'remark-directive'
 import remarkGfm from 'remark-gfm';
@@ -265,7 +265,7 @@ function extract_links(tree,headings){
     return links_list
 }
 
-function get_links_info(entry,content){
+function get_links_info(entry,content,assets_ext){
     const links = []    
     if(content.links.length > 0){
         for(const link of content.links){
@@ -283,7 +283,13 @@ function get_links_info(entry,content){
                 newlink.url = link.url
             }else{
                 const path = join(dirname(entry.path),link.url).replaceAll('\\','/')
-                newlink.path = path
+                const ext = extname(path).slice(1)
+                if(assets_ext.includes(ext)){
+                    newlink.path = path
+                }
+                else{
+                    newlink.url = path
+                }
             }
             links.push(newlink)
         }
