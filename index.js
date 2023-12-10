@@ -31,7 +31,7 @@ async function collect(config){
         }
     }
     const content_assets = await get_all_files(config.assets_ext)
-    await check_add_assets(asset_list,content_assets)
+    await check_add_assets(asset_list,content_assets,config.assets_ext)
     await save_json(asset_list,"asset_list.json")
 }
 
