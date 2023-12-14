@@ -157,15 +157,15 @@ function extract_tables(tree,headings){
 
 async function extract_images(tree, headings,entry) {
     const fileDir = dirname(entry.path)
-    let images_list = [];
     let images_slug_list = [];
+    let imagePromises = [];
     async function processImage(node) {
             const slug = image_slug(node);
             const unique_slug = get_next_uid(slug, images_slug_list);
             images_slug_list.push(unique_slug);
             const image_text = await get_image_text(join(fileDir,node.url));
             const uid = `${entry.uid}#${unique_slug}`
-            images_list.push({
+            return {
                 id: unique_slug,
                 uid:uid,
                 sid:shortMD5(uid),
@@ -174,9 +174,10 @@ async function extract_images(tree, headings,entry) {
                 url: node.url,
                 alt: node.alt,
                 text: image_text,
-            })
+            }
    }
-   visit(tree, 'image', processImage);
+   visit(tree, 'image', (node) => {imagePromises.push(processImage(node))});
+   const images_list = await Promise.all(imagePromises);
    return images_list;
 }
 

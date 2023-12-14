@@ -54,9 +54,7 @@ function relAssetToUrl(relativepath,refFile){
 async function check_dir_create(dirname){
   const config = get_config()
   const abs_dir = join(config.rootdir,config.rel_outdir,dirname)
-  try {
-      await access(abs_dir)
-  } catch {
+  if(!await exists(abs_dir)){
     if(config.debug){
       console.log(`mkdir : '${abs_dir}'`)
     }

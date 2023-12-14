@@ -8,13 +8,13 @@ import {parse_document,collect_documents_data,
 async function collect(config){
     set_config(config)
     const files_paths = await get_all_files(config.content_ext)
+    const documents = await collect_documents_data(files_paths)
+    await check_dir_create("")//even root dir might need creation
+    await save_json(documents,"document_list.json")
+    console.log(`saved document_list.json with ${documents.length} documents`)
     if(config.debug){
         console.log(files_paths)
     }
-    const documents = await collect_documents_data(files_paths)
-    console.log("document_list.json")
-    await check_dir_create("")//even root dir might need creation
-    await save_json(documents,"document_list.json")
 
     const asset_list = []
     for(const entry of documents){
@@ -33,6 +33,7 @@ async function collect(config){
     const content_assets = await get_all_files(config.assets_ext)
     await check_add_assets(asset_list,content_assets)
     await save_json(asset_list,"asset_list.json")
+    console.log(`saved asset_list.json with ${asset_list.length} assets`)
 }
 
 function filter_documents(data,filterCriteria) {
