@@ -1,3 +1,4 @@
+import { get_config } from "../collect.js"
 
 const colors = {
   Reset:"\x1b[0m",
@@ -39,9 +40,16 @@ function warn(text){
   console.log(colors.FgYellow,text,colors.Reset)
 }
 
+function debug(text){
+  const config = get_config()
+  if(config.debug){
+    console.log(text)
+  }
+}
 
 export{
   green_log,
   blue_log,
   warn,
+  debug
 }

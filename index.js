@@ -4,6 +4,7 @@ import {get_images_info,get_codes_info,get_links_info} from './src/md_utils.js'
 import {parse_document,collect_documents_data,
         get_all_files, set_config,parse_markdown,
         check_add_assets} from './src/collect.js'
+import { debug,green_log } from './src/libs/log.js';
 
 async function collect(config){
     set_config(config)
@@ -11,17 +12,15 @@ async function collect(config){
     const documents = await collect_documents_data(files_paths)
     await check_dir_create("")//even root dir might need creation
     await save_json(documents,"document_list.json")
-    console.log(`saved document_list.json with ${documents.length} documents`)
-    if(config.debug){
-        console.log(files_paths)
-    }
+    green_log(`saved document_list.json with ${documents.length} documents`)
+    debug(files_paths)
 
     const asset_list = []
     for(const entry of documents){
         if(entry.format == "markdown"){
             const {tree,content} = await parse_document(entry)
             const dir = join("documents",entry.sid)
-            console.log(entry.path)
+            debug(`   entry.path = ${entry.path}`)
             await check_dir_create(dir)
             await save_json(tree,join(dir,"tree.json"))
             await save_json(content,join(dir,"content.json"))
@@ -33,7 +32,7 @@ async function collect(config){
     const content_assets = await get_all_files(config.assets_ext)
     await check_add_assets(asset_list,content_assets)
     await save_json(asset_list,"asset_list.json")
-    console.log(`saved asset_list.json with ${asset_list.length} assets`)
+    green_log(`saved asset_list.json with ${asset_list.length} assets`)
 }
 
 function filter_documents(data,filterCriteria) {

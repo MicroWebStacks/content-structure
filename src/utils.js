@@ -54,7 +54,7 @@ function relAssetToUrl(relativepath,refFile){
 async function check_dir_create(dirname){
   const config = get_config()
   const abs_dir = join(config.rootdir,config.rel_outdir,dirname)
-  if(!await exists(abs_dir)){
+  if(!await exists_abs(abs_dir)){
     if(config.debug){
       console.log(`mkdir : '${abs_dir}'`)
     }
@@ -74,16 +74,21 @@ function get_next_uid(url,uid_list){
   return newUrl;
 }
 
-async function exists(rel_path) {
-  const config = get_config()
-  const path = join(config.rootdir,config.rel_contentdir,rel_path)
+async function exists_abs(abs_path) {
   try {
-    await access(path, fs_constants.F_OK);
+    await access(abs_path, fs_constants.F_OK);
     return true;
   } catch (error) {
     return false;
   }
 }
+
+async function exists(rel_path) {
+  const config = get_config()
+  const path = join(config.rootdir,config.rel_contentdir,rel_path)
+  return await exists_abs(path)
+}
+
 
 // => out dir
 async function save_json(data,file_path){
@@ -126,6 +131,7 @@ export{
     save_json,
     get_next_uid,
     exists,
+    exists_abs,
     load_yaml,
     load_json,
     load_text

@@ -10,10 +10,12 @@ import {join} from 'path'
 import { exists } from './utils.js';
 import { JSDOM } from 'jsdom';
 import { get_config,shortMD5 } from './collect.js';
+import { debug, warn } from './libs/log.js';
 
 async function get_image_text(path){
     if(!await exists(path)){
-        console.warn(`   (X) file ${path} does not exist`)
+        //silence warning as redundant with the assets check warning
+        //warn(`(X) image ${path} does not exist`)
         return ""
     }
     if(!path.endsWith(".svg")){//only SVG supported for now
@@ -27,7 +29,7 @@ async function get_image_text(path){
     textElements.forEach(textElement => {
         result.push(textElement.textContent)
     });
-    console.log(`   * found ${result.length} text entries in SVG`)
+    debug(`   * found ${result.length} text entries in SVG`)
     return result
 }
 
