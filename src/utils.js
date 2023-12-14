@@ -125,6 +125,24 @@ async function load_text(rel_path){
   return text
 }
 
+function list_to_map(input_list,field){
+  const output_map = input_list.reduce((acc, obj) => {
+    acc[obj[field]] = obj;
+    return acc;
+  }, {});
+  return output_map
+}
+
+function add_documents(asset_map,documents){
+  const output_map = documents.reduce((acc, obj) => {
+    acc[obj.sid] = {
+      type:"document"
+    };
+    return acc;
+  }, asset_map);
+  return output_map
+}
+
 export{
     relAssetToUrl,
     check_dir_create,
@@ -134,5 +152,7 @@ export{
     exists_abs,
     load_yaml,
     load_json,
-    load_text
+    load_text,
+    list_to_map,
+    add_documents
 }

@@ -329,14 +329,29 @@ function extract_refs(tree,headings){
     return refs_list
 }
 
-function get_refs_info(entry,content){
+function get_refs_info(entry,asset_map){
     const refs = []
-    if(content.references.length > 0){
-        for(const ref of content.references){
-            if(["page","sid"].includes(ref.type)){
+    if(Object.hasOwn(entry,"references")){
+        for(const ref of entry.references){
+            if(ref.type == "page"){
                 refs.push({
-                    ...ref,
-                    document:entry.sid
+                    source_type:"document",
+                    source_sid:entry.sid,
+                    source_heading:ref.heading,
+                    target_type:"document",
+                    target_uid:ref.value,
+                    target_sid:shortMD5(ref.value)
+                })
+            }
+            else if(ref.type == "sid"){
+                const target_Asset = asset_map[ref.value]
+                refs.push({
+                    source_type:"document",
+                    source_sid:entry.sid,
+                    source_heading:ref.heading,
+                    target_type:target_Asset.type,
+                    target_uid:ref.value,
+                    target_sid:ref.value
                 })
             }
         }
