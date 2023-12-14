@@ -5,7 +5,7 @@ import {dirname, basename,parse, extname} from 'path'
 import {remark} from 'remark'
 import remarkDirective from 'remark-directive'
 import remarkGfm from 'remark-gfm';
-import {remarkTags} from './ast-tags.js'
+import {remarkMatches} from './ast-matches.js'
 import {join} from 'path'
 import { exists } from './utils.js';
 import { JSDOM } from 'jsdom';
@@ -112,12 +112,12 @@ function node_text(node){
 }
 
 function md_tree(content) {
+    const config = get_config()
     const processor = remark()
         .use(remarkDirective)
         .use(remarkGfm)
     const markdownAST = processor.parse(content);
-
-    const new_markdownAST = remarkTags(markdownAST,get_config().tags)
+    const new_markdownAST = remarkMatches(markdownAST,get_config().matches)
     return new_markdownAST;
 }
 
@@ -143,18 +143,35 @@ function extract_headings(tree){
 
 function extract_tables(tree,headings){
     let tables_list = []
-    let id = 1;
+    let count = 1;
     visit(tree, node=> {
         if (node.type === 'table') {
+            const id = `table-${count}`
             tables_list.push({
-                id:`table-${id}`,
+                id:id,
                 heading:heading_from_line(headings,node.position.start.line),
                 cells:node_text_list(node),
             })
-            id+=1
+            count+=1
         }
     })
     return tables_list
+}
+
+function get_tables_info(entry,content){
+    const tables = []
+    if(content.tables.length > 0){
+        for(const table of content.tables){
+            const uid = `${entry.uid}#${table.id}`
+            tables.push({
+                type:"table",
+                uid:uid,
+                sid:shortMD5(uid),
+                document:entry.sid
+            })
+        }
+    }
+    return tables
 }
 
 async function extract_images(tree, headings,entry) {
@@ -300,16 +317,34 @@ function get_links_info(entry,content,assets_ext){
     return links
 }
 
-function extract_tags(tree,headings){
-    let tags_list = []
-    visit(tree, 'tag',node=> {
-        tags_list.push({
+function extract_refs(tree,headings){
+    let refs_list = []
+    visit(tree, 'reference',node=> {
+        refs_list.push({
             heading:heading_from_line(headings,node.position.start.line),
-            type:node.tag_type,
-            value:node.tag_value
+            type:node.ref_type,
+            value:node.ref_value
         })
     })
-    return tags_list
+    return refs_list
+}
+
+function get_refs_info(entry,content){
+    const refs = []
+    if(content.references.length > 0){
+        for(const ref of content.references){
+            if(["page","sid"].includes(ref.type)){
+                refs.push({
+                    ...ref,
+                    document:entry.sid
+                })
+            }
+        }
+    }
+    if(refs.length > 0){
+        entry.references = refs
+    }
+    return refs
 }
 
 export{
@@ -324,8 +359,10 @@ export{
     node_slug,
     title_slug,
     node_text,
-    extract_tags,
+    extract_refs,
     get_images_info,
+    get_tables_info,
     get_codes_info,
-    get_links_info
+    get_links_info,
+    get_refs_info
 }

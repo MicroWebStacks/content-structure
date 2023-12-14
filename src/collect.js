@@ -4,7 +4,7 @@ import path from 'path';
 import { get_next_uid, load_yaml, load_json, load_text,exists } from './utils.js';
 import { md_tree, title_slug, extract_headings,
         extract_tables,extract_images,extract_code,
-        extract_paragraphs, extract_links,extract_tags } from './md_utils.js';
+        extract_paragraphs, extract_links,extract_refs } from './md_utils.js';
 import matter from 'gray-matter';
 import { createHash } from 'crypto';
 import {warn, debug} from './libs/log.js'
@@ -77,7 +77,7 @@ async function get_all_files(ext_list){
     const originalDirectory = process.cwd();
     process.chdir(content_dir)
     const filter = ext_list.map((ext)=>`*.${ext}`).join(",")
-    console.log(`   searching fole files with extensions : ${filter}`)
+    console.log(`   searching for files with extensions : ${filter}`)
     let glob_query = content_dir+`/**/{${filter}}`
     if(ext_list.length == 1){
         glob_query = content_dir+`/**/${filter}`
@@ -190,8 +190,8 @@ async function parse_markdown(markdown,path){
     entry_details.paragraphs = paragraphs
     const links = extract_links(tree,headings)
     entry_details.links = links
-    const tags = extract_tags(tree,headings)
-    entry_details.tags = tags
+    const references = extract_refs(tree,headings)
+    entry_details.references = references
 
     return {tree,content:entry_details}
 }
@@ -215,8 +215,8 @@ async function parse_document(entry){
     entry_details.paragraphs = paragraphs
     const links = extract_links(tree,headings)
     entry_details.links = links
-    const tags = extract_tags(tree,headings)
-    entry_details.tags = tags
+    const references = extract_refs(tree,headings)
+    entry_details.references = references
 
     return {tree,content:entry_details}
 }

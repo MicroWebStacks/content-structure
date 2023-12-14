@@ -8,10 +8,7 @@ await collect({
     content_ext:["md","json","yml","yaml"],
     assets_ext:["svg","webp","png","jpeg","jpg","xlsx","glb"],
     rel_outdir:"gen",
-    debug:true,
-    tags:{
-        page:'page::(\\w+)'
-    }
+    debug:true
 })
 
 const documents = await getDocuments()
