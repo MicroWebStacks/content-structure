@@ -353,7 +353,7 @@ function get_refs_info(entry,all_items_map){
             source_heading:ref.heading,
             target_type:target_Asset.type,
             target_uid:target_Asset.uid,
-            target_sid:target_Asset.sid
+            target_sid:target_sid
         })
     }
     return refs

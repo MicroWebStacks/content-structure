@@ -136,7 +136,8 @@ function list_to_map(input_list,field){
 function add_documents(asset_map,documents){
   const output_map = documents.reduce((acc, obj) => {
     acc[obj.sid] = {
-      type:"document"
+      type:"document",
+      uid:obj.uid
     };
     return acc;
   }, asset_map);
