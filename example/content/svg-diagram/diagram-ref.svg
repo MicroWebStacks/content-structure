@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="us-ascii" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+    contentStyleType="text/css" height="570px" preserveAspectRatio="none"
+    style="width:414px;height:570px;background:#FFFFFF;" version="1.1" viewBox="0 0 414 570"
+    width="414px" zoomAndPan="magnify">
+    <defs />
+    <g><!--cluster
+        Main-->
+        <g id="cluster_Main">
+            <rect fill="none" height="81" rx="2.5" ry="2.5" style="stroke:#181818;stroke-width:1.0;"
+                width="313" x="73" y="68" />
+            <text fill="#000000" font-family="sans-serif" font-size="14" font-weight="bold"
+                lengthAdjust="spacing" textLength="39" x="210" y="82.9951">Main</text>
+        </g><!--cluster
+        Base-->
+        <g id="cluster_Base">
+            <rect fill="none" height="183" rx="2.5" ry="2.5"
+                style="stroke:#181818;stroke-width:1.0;" width="347" x="61" y="173" />
+            <text fill="#000000" font-family="sans-serif" font-size="14" font-weight="bold"
+                lengthAdjust="spacing" textLength="39" x="215" y="187.9951">Base</text>
+        </g><!--cluster
+        More-->
+        <g id="cluster_More">
+            <rect fill="none" height="80" rx="2.5" ry="2.5" style="stroke:#181818;stroke-width:1.0;"
+                width="206" x="8" y="380" />
+            <text fill="#000000" font-family="sans-serif" font-size="14" font-weight="bold"
+                lengthAdjust="spacing" textLength="40" x="91" y="394.9951">More</text>
+        </g><!--cluster
+        EvenMore-->
+        <g id="cluster_EvenMore">
+            <rect fill="none" height="80" rx="2.5" ry="2.5" style="stroke:#181818;stroke-width:1.0;"
+                width="204" x="7" y="484" />
+            <text fill="#000000" font-family="sans-serif" font-size="14" font-weight="bold"
+                lengthAdjust="spacing" textLength="77" x="70.5" y="498.9951">EvenMore</text>
+        </g>
+        <g id="elem_main.view">
+            <ellipse cx="152.2349" cy="117.947" fill="#F1F1F1" rx="62.7349" ry="14.947"
+                style="stroke:#181818;stroke-width:0.5;" />
+            <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing"
+                textLength="72" x="113.2349" y="121.6945">main.view</text>
+        </g>
+        <g id="elem_singleton">
+            <ellipse cx="310.0664" cy="117.7722" fill="#F1F1F1" rx="60.0664" ry="14.7722"
+                style="stroke:#181818;stroke-width:0.5;" />
+            <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing"
+                textLength="67" x="273.5664" y="121.5198">singleton</text>
+        </g>
+        <g id="elem_base.component">
+            <ellipse cx="158.8658" cy="320.7732" fill="#F1F1F1" rx="81.8658" ry="18.7732"
+                style="stroke:#181818;stroke-width:0.5;" />
+            <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing"
+                textLength="123" x="96.3805" y="323.9463">base.component</text>
+        </g>
+        <g id="elem_component">
+            <ellipse cx="143.8142" cy="224.7628" fill="#F1F1F1" rx="66.8142" ry="15.7628"
+                style="stroke:#181818;stroke-width:0.5;" />
+            <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing"
+                textLength="84" x="98.8142" y="228.5104">component</text>
+        </g>
+        <g id="elem_model">
+            <ellipse cx="318.8073" cy="224.8615" fill="#F1F1F1" rx="72.3073" ry="16.8615"
+                style="stroke:#181818;stroke-width:0.5;" />
+            <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing"
+                textLength="99" x="266.3073" y="228.609">sid::033bf3a0</text>
+        </g>
+        <g id="elem_more">
+            <ellipse cx="158.9534" cy="429.5556" fill="#F1F1F1" rx="38.4534" ry="14.5556"
+                style="stroke:#181818;stroke-width:0.5;" />
+            <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing"
+                textLength="38" x="138.0903" y="433.0095">more</text>
+        </g>
+        <g id="elem_less">
+            <ellipse cx="55.0772" cy="429.5236" fill="#F1F1F1" rx="30.5772" ry="14.5236"
+                style="stroke:#181818;stroke-width:0.5;" />
+            <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing"
+                textLength="27" x="41.5772" y="432.3703">less</text>
+        </g>
+        <g id="elem_even">
+            <ellipse cx="157.7722" cy="533.5369" fill="#F1F1F1" rx="36.2722" ry="14.5369"
+                style="stroke:#181818;stroke-width:0.5;" />
+            <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing"
+                textLength="35" x="139.1457" y="536.7741">even</text>
+        </g>
+        <g id="elem_why">
+            <ellipse cx="54.7843" cy="533.5236" fill="#F1F1F1" rx="31.2843" ry="14.5236"
+                style="stroke:#181818;stroke-width:0.5;" />
+            <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing"
+                textLength="28" x="40.7843" y="536.3703">why</text>
+        </g><!--entity
+        main_ts-->
+        <g id="elem_main_ts">
+            <rect fill="#F1F1F1" height="36.2969" rx="2.5" ry="2.5"
+                style="stroke:#181818;stroke-width:0.5;" width="82" x="111" y="7" />
+            <text fill="#000000" font-family="sans-serif" font-size="14" font-weight="bold"
+                lengthAdjust="spacing" textLength="62" x="121" y="29.9951">main.ts</text>
+        </g><!--link
+        component to base.component-->
+        <g id="link_component_base.component">
+            <path d="M146.41,241.103 C149.044,257.606 152.3165,278.119 155.1355,295.785 "
+                fill="none" id="component-to-base.component"
+                style="stroke:#181818;stroke-width:1.0;stroke-dasharray:7.0,7.0;" />
+            <polygon fill="#181818"
+                points="156.081,301.71,158.6128,292.1921,155.2931,296.7725,150.7128,293.4528,156.081,301.71"
+                style="stroke:#181818;stroke-width:1.0;" />
+        </g><!--link
+        main_ts to main.view-->
+        <g id="link_main_ts_main.view">
+            <path d="M152,43.116 C152,60.415 152,80.829 152,96.943 " fill="none"
+                id="main_ts-to-main.view" style="stroke:#181818;stroke-width:2.0;" />
+            <polygon fill="#181818"
+                points="152,102.943,156,93.943,152,97.943,148,93.943,152,102.943"
+                style="stroke:#181818;stroke-width:2.0;" />
+        </g><!--link
+        main.view to component-->
+        <g id="link_main.view_component">
+            <path d="M150.921,133.161 C149.42,152.865 147.1681,182.4294 145.6211,202.7214 "
+                fill="none" id="main.view-to-component" style="stroke:#181818;stroke-width:1.0;" />
+            <polygon fill="#181818"
+                points="145.165,208.704,149.8376,200.0341,145.5451,203.7185,141.8607,199.426,145.165,208.704"
+                style="stroke:#181818;stroke-width:1.0;" />
+        </g><!--link
+        main.view to singleton-->
+        <g id="link_main.view_singleton">
+            <path d="M214.645,118 C226.316,118 231.987,118 243.658,118 " fill="none"
+                id="main.view-to-singleton" style="stroke:#181818;stroke-width:1.0;" />
+            <polygon fill="#181818"
+                points="249.658,118,240.658,114,244.658,118,240.658,122,249.658,118"
+                style="stroke:#181818;stroke-width:1.0;" />
+        </g><!--link
+        singleton to model-->
+        <g id="link_singleton_model">
+            <path d="M311.214,133.161 C312.874,152.529 315.3335,181.2259 317.0865,201.6749 "
+                fill="none" id="singleton-to-model"
+                style="stroke:#181818;stroke-width:1.0;stroke-dasharray:7.0,7.0;" />
+            <polygon fill="#181818"
+                points="317.599,207.653,320.8157,198.3442,317.1719,202.6713,312.8449,199.0275,317.599,207.653"
+                style="stroke:#181818;stroke-width:1.0;" />
+        </g><!--link
+        base.component to more-->
+        <g id="link_base.component_more">
+            <path d="M159,340.066 C159,361.193 159,389.695 159,408.758 " fill="none"
+                id="base.component-to-more"
+                style="stroke:#181818;stroke-width:1.0;stroke-dasharray:7.0,7.0;" />
+            <polygon fill="#181818"
+                points="159,414.758,163,405.758,159,409.758,155,405.758,159,414.758"
+                style="stroke:#181818;stroke-width:1.0;" />
+        </g><!--link
+        less to why-->
+        <g id="link_less_why">
+            <path d="M55,444.256 C55,463.832 55,493.5059 55,512.9618 " fill="none" id="less-to-why"
+                style="stroke:#181818;stroke-width:1.0;" />
+            <polygon fill="#181818"
+                points="55,518.9618,59,509.9618,55,513.9618,51,509.9618,55,518.9618"
+                style="stroke:#181818;stroke-width:1.0;" />
+        </g><!--SRC=[PL113e8m4Bpt5HjESW19k17emSGZRp0jhDe4MaCRY37-tRP2RF4sipkxixCJTeR9su2Gj4p815u4u31QcCy2bzGnBPp0A9cIDvb-0oUcSHtW5kQT6XzAeZH-AcPQz5LLb2M_bgn8WMaOLOz3lB3cr3iRNHyvJRpAyelHeQfLqsOxMkZN3wZrxhhpZ3AGegLUkjoVJab8S27aEVqFiNf3qz3e9G66Z4P9zwtWTG7-sla7sFhETckwPDzSaBbLxkuF]-->
+    </g>
+</svg>

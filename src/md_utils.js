@@ -5,7 +5,7 @@ import {dirname, basename,parse, extname} from 'path'
 import {remark} from 'remark'
 import remarkDirective from 'remark-directive'
 import remarkGfm from 'remark-gfm';
-import {remarkMatches} from './ast-matches.js'
+import {remarkMatches} from './node-text-matches.js'
 import {join} from 'path'
 import { exists } from './utils.js';
 import { JSDOM } from 'jsdom';
@@ -112,7 +112,6 @@ function node_text(node){
 }
 
 function md_tree(content) {
-    const config = get_config()
     const processor = remark()
         .use(remarkDirective)
         .use(remarkGfm)
@@ -329,35 +328,33 @@ function extract_refs(tree,headings){
     return refs_list
 }
 
-function get_refs_info(entry,asset_map){
-    const refs = []
-    if(Object.hasOwn(entry,"references")){
-        for(const ref of entry.references){
-            if(ref.type == "page"){
-                refs.push({
-                    source_type:"document",
-                    source_sid:entry.sid,
-                    source_heading:ref.heading,
-                    target_type:"document",
-                    target_uid:ref.value,
-                    target_sid:shortMD5(ref.value)
-                })
-            }
-            else if(ref.type == "sid"){
-                const target_Asset = asset_map[ref.value]
-                refs.push({
-                    source_type:"document",
-                    source_sid:entry.sid,
-                    source_heading:ref.heading,
-                    target_type:target_Asset.type,
-                    target_uid:ref.value,
-                    target_sid:ref.value
-                })
-            }
-        }
+function get_refs_info(entry,all_items_map){
+    const references = entry.references.map((ref)=>({
+        source_type:"document",
+        source_sid:entry.sid,
+        ...ref
+    }))
+    for(const image of entry.images){
+        const image_entries = image.references.map((ref)=>({
+            source_type:"image",
+            source_sid:image.sid,
+            heading:image.heading,
+            ...ref
+        }))
+        references.push(...image_entries)
     }
-    if(refs.length > 0){
-        entry.references = refs
+    const refs = []
+    for(const ref of references){
+        const target_sid = (ref.type=="page")?shortMD5(ref.value):ref.value
+        const target_Asset = all_items_map[target_sid]
+        refs.push({
+            source_type:ref.source_type,
+            source_sid:ref.source_sid,
+            source_heading:ref.heading,
+            target_type:target_Asset.type,
+            target_uid:target_Asset.uid,
+            target_sid:target_Asset.sid
+        })
     }
     return refs
 }

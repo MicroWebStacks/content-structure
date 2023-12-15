@@ -6,6 +6,10 @@ title: Test Many
 
 `special text`
 
+# Image
+
+![Long Diagram](./long-diagram.svg)
+
 ## heading 2
 more text
 

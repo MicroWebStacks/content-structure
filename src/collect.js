@@ -8,7 +8,7 @@ import { md_tree, title_slug, extract_headings,
 import matter from 'gray-matter';
 import { createHash } from 'crypto';
 import {warn, debug} from './libs/log.js'
-
+import {textListMatches} from './node-text-matches.js'
 
 let config = {
     rootdir: process.cwd(),
@@ -174,15 +174,18 @@ async function collect_documents_data(files_paths){
     return content_entries
 }
 
-async function parse_markdown(markdown,path){
-    const entry_details = {path:path}
-    const tree = md_tree(markdown)
-    
+async function tree_content(markdown_text,entry_details){
+    const config = get_config()
+    const {content, data} = matter(markdown_text)
+    const tree = md_tree(content)
     const headings = extract_headings(tree)
     entry_details.headings = headings
     const tables = extract_tables(tree,headings)
     entry_details.tables = tables
-    const images = await extract_images(tree,headings,dirname(path))
+    const images = await extract_images(tree,headings,entry_details)
+    for(const image of images){
+        image.references = textListMatches(image.text,config.matches)
+    }
     entry_details.images = images
     const code = extract_code(tree,headings)
     entry_details.code = code
@@ -196,29 +199,19 @@ async function parse_markdown(markdown,path){
     return {tree,content:entry_details}
 }
 
+//unused internally, exported service
+async function parse_markdown(markdown,path){
+    const entry_details = {
+        path:path,
+        uid:path//for images uid assignments
+    }
+    return tree_content(markdown,entry_details)
+}
+
 async function parse_document(entry){
     const entry_details = JSON.parse(JSON.stringify(entry))
-    const text = await load_text(entry.path)
-
-    const {content, data} = matter(text)
-    const tree = md_tree(content)
-    
-    const headings = extract_headings(tree)
-    entry_details.headings = headings
-    const tables = extract_tables(tree,headings)
-    entry_details.tables = tables
-    const images = await extract_images(tree,headings,entry)
-    entry_details.images = images
-    const code = extract_code(tree,headings)
-    entry_details.code = code
-    const paragraphs = extract_paragraphs(tree,headings)
-    entry_details.paragraphs = paragraphs
-    const links = extract_links(tree,headings)
-    entry_details.links = links
-    const references = extract_refs(tree,headings)
-    entry_details.references = references
-
-    return {tree,content:entry_details}
+    const markdown_text = await load_text(entry.path)
+    return tree_content(markdown_text,entry_details)
 }
 
 async function check_add_assets(asset_list,content_assets){

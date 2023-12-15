@@ -13,12 +13,10 @@ await collect({
 
 const documents = await getDocuments()
 console.log(`\nobtained ${documents.length} documents`)
-
 const authors = await getDocuments({content_type:"authors"})
-console.log(`\nfound ${authors.length} authors`)
-
+console.log(`found ${authors.length} authors`)
 const generic_markdown = await getDocuments({format:"markdown",content_type:"generic"})
-console.log(`\nfound ${generic_markdown.length} generic markdown entries\n`)
+console.log(`found ${generic_markdown.length} generic markdown entries`)
 
 const image_entry = await getEntry({slug:"image"})
 const images_urls = image_entry.data.images.map(image=>image.url)

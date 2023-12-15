@@ -1,5 +1,17 @@
 import { visit } from 'unist-util-visit';
 
+function text_match(text,match_regex){
+    let result = new Set()
+    const regex = new RegExp(match_regex, 'g');
+    const matches = text.matchAll(regex);
+    let hasMatches = false;
+    for(const match of matches){
+        hasMatches = true
+        result.add(match[1])
+    }
+    return [...result]
+}
+
 function visit_node_match(node,index, parent,match_key,match_regex){
     let new_nodes = []
     const regex = new RegExp(match_regex, 'g');
@@ -54,6 +66,23 @@ function remarkMatches(tree,matches) {
     return tree
 }
 
+function textListMatches(textList,matches){
+    let result = []
+    for(const match in matches){
+        for(const text of textList){
+            const text_hits = text_match(text,matches[match])//every text entry can have many matches
+            for(const hit of text_hits){
+                result.push({
+                    type:match,
+                    value:hit
+                })
+            }
+        }
+    }
+    return result
+}
+
 export{
-    remarkMatches
+    remarkMatches,
+    textListMatches
 }
