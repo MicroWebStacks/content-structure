@@ -52,6 +52,12 @@ async function collect(config){
     }
 
     await check_dir_create("")//even root dir might need creation, in case of empty docs
+    const ids = {}
+    Object.entries(all_items_map).forEach(([key, value]) => {
+            ids[key] = value.uid
+        });
+    await save_json(ids,"ids.json")
+    green_log(`saved ids.json with ${Object.keys(ids).length} ids (documents+assets)`)
     await save_json(documents,"document_list.json")
     green_log(`saved document_list.json with ${documents.length} documents`)
     await save_json(asset_list,"asset_list.json")
