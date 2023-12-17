@@ -130,7 +130,7 @@ function extract_headings(tree){
             const unique_heading_slug = get_next_uid(heading_slug,heading_slug_list)
             heading_slug_list.push(unique_heading_slug)
             headings_list.push({
-                text:heading_text,
+                label:heading_text,
                 slug:unique_heading_slug,
                 depth:node.depth,
                 line:node.position.start.line

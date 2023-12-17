@@ -193,18 +193,18 @@ example of generated files for `image/readme.md` which has an sid of `78805a22`
       "title": null,
       "url": "./tree.svg",
       "alt": "Tree",
-      "text": ""
+      "label": ""
     }
   ],
   "code": [],
   "paragraphs": [
     {
       "heading": null,
-      "text": []
+      "label": []
     },
     {
       "heading": null,
-      "text": []
+      "label": []
     }
   ]
 }
