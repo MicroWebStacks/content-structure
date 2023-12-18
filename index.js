@@ -22,7 +22,7 @@ async function collect(config){
 
     const asset_list = []
     for(const entry of documents){
-        if(entry.format == "markdown"){
+        if(entry.format.startsWith("markdown")){
             debug(` parsing sid: ${entry.sid} path: ${entry.path}`)
             const {tree,content} = await parse_document(entry)
             const dir = join("documents",entry.sid)
@@ -44,7 +44,7 @@ async function collect(config){
     const all_items_map = add_documents(asset_map,documents)
     const reference_list = []
     for(const entry of documents){
-        if(entry.format == "markdown"){
+        if(entry.format.startsWith("markdown")){
             reference_list.push(...get_refs_info(entry,all_items_map))
             delete entry.references
             delete entry.images
