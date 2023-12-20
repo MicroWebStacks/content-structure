@@ -103,8 +103,8 @@ function title_slug(title){
   return slug
 }
 
-function code_slug(node){
-    let slug = node.lang
+function code_slug(node,language){
+    let slug = language
     if(node.meta != null){
         slug += '-'+node.meta.split(/\s+/).join('-')
     }
@@ -258,7 +258,8 @@ function extract_code(tree,headings,entry){
     let code_slug_list = []
     visit(tree, node=> {
         if (node.type === 'code') {
-            const slug = code_slug(node)
+            const language = node.lang?node.lang:"code"
+            const slug = code_slug(node,language)
             const unique_slug = get_next_uid(slug,code_slug_list)
             const uid = `${entry.uid}#${unique_slug}`
             code_slug_list.push(unique_slug)
@@ -266,7 +267,7 @@ function extract_code(tree,headings,entry){
                 id:unique_slug,
                 uid:uid,
                 sid:shortMD5(uid),
-                language:node.lang?node.lang:"code",
+                language:language,
                 heading:heading_from_line(headings,node.position.start.line),
                 text:node.value
             })
