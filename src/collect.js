@@ -180,14 +180,14 @@ async function tree_content(markdown_text,entry_details){
     const tree = md_tree(content)
     const headings = extract_headings(tree)
     entry_details.headings = headings
-    const tables = extract_tables(tree,headings)
+    const tables = extract_tables(tree,headings,entry_details)
     entry_details.tables = tables
     const images = await extract_images(tree,headings,entry_details)
     for(const image of images){
         image.references = textListMatches(image.text,config.matches)
     }
     entry_details.images = images
-    const code = extract_code(tree,headings)
+    const code = extract_code(tree,headings,entry_details)
     entry_details.code = code
     const paragraphs = extract_paragraphs(tree,headings)
     entry_details.paragraphs = paragraphs
@@ -203,7 +203,8 @@ async function tree_content(markdown_text,entry_details){
 async function parse_markdown(markdown,path){
     const entry_details = {
         path:path,
-        uid:path//for images uid assignments
+        uid:path,//for images uid assignments
+        sid:shortMD5(path)
     }
     return tree_content(markdown,entry_details)
 }

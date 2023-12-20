@@ -173,16 +173,19 @@ function extract_headings(tree){
     return headings_list
 }
 
-function extract_tables(tree,headings){
+function extract_tables(tree,headings,entry){
     let tables_list = []
     let count = 1;
     visit(tree, node=> {
         if (node.type === 'table') {
             const id = `table-${count}`
+            const uid = `${entry.uid}#${id}`
             const text = node_text_list(node).join(" ")
             const data = astToObjectsList(node)
             tables_list.push({
                 id:id,
+                uid:uid,
+                sid:shortMD5(uid),
                 heading:heading_from_line(headings,node.position.start.line),
                 text:text,
                 data:data
@@ -197,11 +200,10 @@ function get_tables_info(entry,content){
     const tables = []
     if(content.tables.length > 0){
         for(const table of content.tables){
-            const uid = `${entry.uid}#${table.id}`
             tables.push({
                 type:"table",
-                uid:uid,
-                sid:shortMD5(uid),
+                uid:table.uid,
+                sid:table.sid,
                 document:entry.sid
             })
         }
@@ -252,16 +254,19 @@ function get_images_info(entry,content){
     return images
 }
 
-function extract_code(tree,headings){
+function extract_code(tree,headings,entry){
     let code_list = []
     let code_slug_list = []
     visit(tree, node=> {
         if (node.type === 'code') {
             const slug = code_slug(node)
             const unique_slug = get_next_uid(slug,code_slug_list)
+            const uid = `${entry.uid}#${unique_slug}`
             code_slug_list.push(unique_slug)
             code_list.push({
                 id:unique_slug,
+                uid:uid,
+                sid:shortMD5(uid),
                 language:node.lang?node.lang:"code",
                 heading:heading_from_line(headings,node.position.start.line),
                 value:node.value
@@ -275,11 +280,10 @@ function get_codes_info(entry,content){
     const codes = []    
     if(content.code.length > 0){
         for(const code of content.code){
-            const uid = `${entry.uid}#${code.id}`
             codes.push({
                 type:"code",
-                uid:uid,
-                sid:shortMD5(uid),
+                uid:code.uid,
+                sid:code.sid,
                 hash:shortMD5(code.value),
                 document:entry.sid,
                 language:code.language
