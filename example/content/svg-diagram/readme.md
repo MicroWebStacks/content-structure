@@ -4,4 +4,4 @@ title: Diagram
 
 ![Diagram ref](./diagram-ref.svg)
 
-mentionning sid::4bbe4fdd as a nice table
+mentionning sid::d22fc345 as a team table

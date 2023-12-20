@@ -7,7 +7,7 @@ await collect({
     rel_contentdir:"content",
     content_ext:["md","json","yml","yaml"],
     assets_ext:["svg","webp","png","jpeg","jpg","xlsx","glb"],
-    rel_outdir:"gen",
+    rel_outdir:".structure",
     debug:true
 })
 

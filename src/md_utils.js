@@ -64,6 +64,39 @@ function node_text_list(node){
     return text_list;
 }
 
+//also in (astro-big-doc)src\components\markdown\table\table.js
+function astToDataTable(tableNode) {
+    const data = [];
+    for (const row of tableNode.children) {
+        if (row.type === 'tableRow') {
+        const rowData = [];
+        for (const cell of row.children) {
+            if (cell.type === 'tableCell') {
+            const textNode = cell.children.find(child => child.type === 'text');
+            if (textNode) {
+                rowData.push(textNode.value);
+            }
+            }
+        }
+
+        data.push(rowData);
+        }
+    }
+
+    return data;
+}
+
+function astToObjectsList(node){
+    const [table_head, ...table_rows] = astToDataTable(node);
+    const ObjectsList = table_rows.map(row => {
+        let obj = {};
+        table_head.forEach((header, index) => {
+          obj[header] = row[index];
+        });
+        return obj;
+      });
+    return ObjectsList
+}
 
 function title_slug(title){
   const slug = slugify(title,{lower:true})
@@ -146,10 +179,13 @@ function extract_tables(tree,headings){
     visit(tree, node=> {
         if (node.type === 'table') {
             const id = `table-${count}`
+            const text = node_text_list(node).join(" ")
+            const data = astToObjectsList(node)
             tables_list.push({
                 id:id,
                 heading:heading_from_line(headings,node.position.start.line),
-                cells:node_text_list(node),
+                text:text,
+                data:data
             })
             count+=1
         }
@@ -346,6 +382,10 @@ function get_refs_info(entry,all_items_map){
     const refs = []
     for(const ref of references){
         const target_sid = (ref.type=="page")?shortMD5(ref.value):ref.value
+        if(!Object.hasOwn(all_items_map,target_sid)){
+            warn(`(X) dropping reference '${ref.value}' that does not exist, referenced from '${ref.source_sid}'`)
+            continue
+        }
         const target_Asset = all_items_map[target_sid]
         refs.push({
             source_type:ref.source_type,
