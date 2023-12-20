@@ -180,14 +180,13 @@ function extract_tables(tree,headings,entry){
         if (node.type === 'table') {
             const id = `table-${count}`
             const uid = `${entry.uid}#${id}`
-            const text = node_text_list(node).join(" ")
             const data = astToObjectsList(node)
             tables_list.push({
                 id:id,
                 uid:uid,
                 sid:shortMD5(uid),
                 heading:heading_from_line(headings,node.position.start.line),
-                text:text,
+                text:node_text(node),
                 data:data
             })
             count+=1
@@ -229,7 +228,7 @@ async function extract_images(tree, headings,entry) {
                 title: node.title,
                 url: node.url,
                 alt: node.alt,
-                text: image_text,
+                text_list: image_text,
             }
    }
    visit(tree, 'image', (node) => {imagePromises.push(processImage(node))});
@@ -269,7 +268,7 @@ function extract_code(tree,headings,entry){
                 sid:shortMD5(uid),
                 language:node.lang?node.lang:"code",
                 heading:heading_from_line(headings,node.position.start.line),
-                value:node.value
+                text:node.value
             })
         }
     })
@@ -284,7 +283,7 @@ function get_codes_info(entry,content){
                 type:"code",
                 uid:code.uid,
                 sid:code.sid,
-                hash:shortMD5(code.value),
+                hash:shortMD5(code.text),
                 document:entry.sid,
                 language:code.language
             })
@@ -300,7 +299,7 @@ function extract_paragraphs(tree,headings){
     visit(tree, "paragraph", node=> {
         paragraphs_list.push({
             heading:heading_from_line(headings,node.position.start.line),
-            text:node_text_list(node)
+            text:node_text(node)
         })
     })
     return paragraphs_list
@@ -310,7 +309,7 @@ function extract_links(tree,headings){
     let links_list = []
     let slug_list = [];
     visit(tree, "link", node=> {
-        const text = node_text_list(node).join(" ")
+        const text = node_text(node)
         const slug = link_slug(node,text)
         const unique_slug = get_next_uid(slug, slug_list);
         links_list.push({

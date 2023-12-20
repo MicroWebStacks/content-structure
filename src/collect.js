@@ -184,7 +184,7 @@ async function tree_content(markdown_text,entry_details){
     entry_details.tables = tables
     const images = await extract_images(tree,headings,entry_details)
     for(const image of images){
-        image.references = textListMatches(image.text,config.matches)
+        image.references = textListMatches(image.text_list,config.matches)
     }
     entry_details.images = images
     const code = extract_code(tree,headings,entry_details)
