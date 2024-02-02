@@ -240,7 +240,10 @@ function get_images_info(entry,content){
     const images = []
     if(content.images.length > 0){
         for(const image of content.images){
-            const path = join(dirname(entry.path),image.url).replaceAll('\\','/')
+            let path = join(dirname(entry.path),image.url).replaceAll('\\','/')
+            if(image.url.startsWith("/")){
+                path = image.url
+            }
             images.push({
                 type:"image",
                 uid:image.uid,
