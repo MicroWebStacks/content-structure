@@ -344,7 +344,10 @@ function get_links_info(entry,content,assets_ext){
             if(external){
                 newlink.url = link.url
             }else{
-                const path = join(dirname(entry.path),link.url).replaceAll('\\','/')
+                let path = join(dirname(entry.path),link.url).replaceAll('\\','/')
+                if(link.url.startsWith("/")){
+                    path = link.url
+                }
                 const ext = extname(path).slice(1)
                 if(assets_ext.includes(ext)){
                     newlink.path = path
