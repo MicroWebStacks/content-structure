@@ -75,6 +75,7 @@ function get_next_uid(url,uid_list){
 }
 
 async function exists_abs(abs_path) {
+  abs_path = decodeURIComponent(abs_path)
   try {
     await access(abs_path, fs_constants.F_OK);
     return true;
@@ -126,7 +127,8 @@ async function load_json(rel_path,dir="content"){
 async function load_text(rel_path){
   const config = get_config()
   const path = join(config.rootdir,config.rel_contentdir,rel_path)
-  const text = await readFile(path,'utf-8')
+  const filepath = decodeURIComponent(path)//could be an image url
+  const text = await readFile(filepath,'utf-8')
   return text
 }
 
