@@ -89,6 +89,11 @@ async function exists(rel_path) {
   return await exists_abs(path)
 }
 
+async function exists_public(rel_path) {
+  const config = get_config()
+  const path = join(config.rootdir,"public",rel_path)
+  return await exists_abs(path)
+}
 
 // => out dir
 async function save_json(data,file_path){
@@ -150,6 +155,7 @@ export{
     save_json,
     get_next_uid,
     exists,
+    exists_public,
     exists_abs,
     load_yaml,
     load_json,

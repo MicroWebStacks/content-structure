@@ -1,7 +1,7 @@
 import {glob} from 'glob'
 import { relative, resolve, join, sep, basename, dirname, parse, extname } from 'path';
 import path from 'path';
-import { get_next_uid, load_yaml, load_json, load_text,exists } from './utils.js';
+import { get_next_uid, load_yaml, load_json, load_text,exists,exists_public } from './utils.js';
 import { md_tree, title_slug, extract_headings,
         extract_tables,extract_images,extract_code,
         extract_paragraphs, extract_links,extract_refs } from './md_utils.js';
@@ -220,8 +220,12 @@ async function check_add_assets(asset_list,content_assets){
     for(const asset of asset_list){
         if(Object.hasOwn(asset,"path")){
             referenced_locals.add(asset.path)
-            if(!await exists(asset.path)){
-                warn(`(X) asset does not exist '${asset.path}'`)
+            if(asset.path.startsWith("/")){
+                if(!await exists_public(asset.path)){
+                    warn(`(X) asset does not exist in public '${asset.path}'`)
+                }
+            }else if(!await exists(asset.path)){
+                warn(`(X) asset does not exist in content '${asset.path}'`)
             }
         }
     }
