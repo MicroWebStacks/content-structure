@@ -1,13 +1,15 @@
 import {collect, getDocuments, getEntry} from 'content-structure'
 import {fileURLToPath} from 'url';
-import {dirname} from 'path'
+import {dirname,join} from 'path'
+
+const rootdir = dirname(fileURLToPath(import.meta.url))
 
 await collect({
-    rootdir:dirname(fileURLToPath(import.meta.url)),
-    rel_contentdir:"content",
+    rootdir:rootdir,
+    contentdir:join(rootdir,"content"),
     content_ext:["md","json","yml","yaml"],
     assets_ext:["svg","webp","png","jpeg","jpg","xlsx","glb"],
-    rel_outdir:".structure",
+    outdir:join(rootdir,".structure"),
     debug:true
 })
 

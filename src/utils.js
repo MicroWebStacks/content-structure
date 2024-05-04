@@ -21,11 +21,11 @@ function relAssetToUrl(relativepath,refFile){
     if(existsSync(filepath)){
       //console.log(`   * impo*rt.me*ta.ur*l = ${import.meta.url}`)
       const config = get_config()
-      let rel_outdir = config.rel_outdir
+      let outdir = config.outdir
       if(import.meta.env.MODE == "development"){
-        rel_outdir = "public"
+        outdir = join(config.rootdir,"public")
       }
-      const targetroot = join(config.rootdir,rel_outdir,"raw")
+      const targetroot = join(outdir,"raw")
       const filerootrel = relative(config.rootdir,refdir)
       const targetpath = resolve(targetroot,filerootrel)
       const targetfile = join(targetpath,relativepath)
@@ -53,7 +53,7 @@ function relAssetToUrl(relativepath,refFile){
 
 async function check_dir_create(dirname){
   const config = get_config()
-  const abs_dir = join(config.rootdir,config.rel_outdir,dirname)
+  const abs_dir = join(config.outdir,dirname)
   if(!await exists_abs(abs_dir)){
     if(config.debug){
       console.log(`mkdir : '${abs_dir}'`)
@@ -86,7 +86,7 @@ async function exists_abs(abs_path) {
 
 async function exists(rel_path) {
   const config = get_config()
-  const path = join(config.rootdir,config.rel_contentdir,rel_path)
+  const path = join(config.contentdir,rel_path)
   return await exists_abs(path)
 }
 
@@ -99,7 +99,7 @@ async function exists_public(rel_path) {
 // => out dir
 async function save_json(data,file_path){
   const config = get_config()
-  const filepath = join(config.rootdir,config.rel_outdir,file_path)
+  const filepath = join(config.outdir,file_path)
   await writeFile(filepath,JSON.stringify(data,undefined, 2))
   //if(config.debug){
   //  console.log(` saved json file ${filepath}`)
@@ -109,7 +109,7 @@ async function save_json(data,file_path){
 // content dir =>
 async function load_yaml(rel_path){
   const config = get_config()
-  const path = join(config.rootdir,config.rel_contentdir,rel_path)
+  const path = join(config.contentdir,rel_path)
   const fileContent = await readFile(path, 'utf8');
   const data = yaml.load(fileContent);
   return data;
@@ -118,15 +118,15 @@ async function load_yaml(rel_path){
 // content dir =>
 async function load_json(rel_path,dir="content"){
   const config = get_config()
-  const rel_folder = (dir=="content")?config.rel_contentdir:config.rel_outdir
-  const path = join(config.rootdir,rel_folder,rel_path)
+  const abs_folder = (dir=="content")?config.contentdir:config.outdir
+  const path = join(abs_folder,rel_path)
   const text = await readFile(path,'utf-8')
   return JSON.parse(text)
 }
 
 async function load_text(rel_path){
   const config = get_config()
-  const path = join(config.rootdir,config.rel_contentdir,rel_path)
+  const path = join(config.contentdir,rel_path)
   const filepath = decodeURIComponent(path)//could be an image url
   const text = await readFile(filepath,'utf-8')
   return text

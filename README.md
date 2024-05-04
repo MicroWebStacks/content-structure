@@ -100,7 +100,7 @@ the field `url_type` will also be exposed for the user as in the example entry b
 ## Config parameters
 the config parameter is optional and do have default values
 * `rootdir` : defaults to current working directory. The path where to find the a `content` directory.
-* `rel_outdir` : defaults to `gen`. Relative output directory is the location where all output data will be generated, which is relative to the root directory.
+* `outdir` : defaults to `.structure`. Relative output directory is the location where all output data will be generated, which is relative to the root directory.
 
 ## Generated output
 * `gen/document_list.json`

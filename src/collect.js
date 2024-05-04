@@ -12,8 +12,8 @@ import {textListMatches} from './node-text-matches.js'
 
 let config = {
     rootdir: process.cwd(),
-    rel_contentdir: "content",
-    rel_outdir: "gen",
+    contentdir: "content",
+    outdir: ".structure",
     debug:false
 }
 
@@ -72,7 +72,7 @@ function shortMD5(text) {
   
   
 async function get_all_files(ext_list){
-    const content_dir = join(config.rootdir,config.rel_contentdir);
+    const content_dir = join(config.contentdir);
     console.log(`content_dir : ${content_dir}`)
     const originalDirectory = process.cwd();
     process.chdir(content_dir)
