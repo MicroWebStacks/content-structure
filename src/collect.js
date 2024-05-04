@@ -72,19 +72,18 @@ function shortMD5(text) {
   
   
 async function get_all_files(ext_list){
-    const content_dir = join(config.contentdir);
-    console.log(`content_dir : ${content_dir}`)
+    console.log(`content_dir : ${config.contentdir}`)
     const originalDirectory = process.cwd();
-    process.chdir(content_dir)
+    process.chdir(config.contentdir)
     const filter = ext_list.map((ext)=>`*.${ext}`).join(",")
     console.log(`   searching for files with extensions : ${filter}`)
-    let glob_query = content_dir+`/**/{${filter}}`
+    let glob_query = config.contentdir+`/**/{${filter}}`
     if(ext_list.length == 1){
-        glob_query = content_dir+`/**/${filter}`
+        glob_query = config.contentdir+`/**/${filter}`
     }
     const results = await glob(glob_query)
     //change to abs then rel to be cross os compatible
-    const files = results.map((file)=>(relative(content_dir,resolve(content_dir,file)).split(sep).join('/')))
+    const files = results.map((file)=>(relative(config.contentdir,resolve(config.contentdir,file)).split(sep).join('/')))
     debug(`change back to originalDirectory : ${originalDirectory}`)
     process.chdir(originalDirectory)
     return files
