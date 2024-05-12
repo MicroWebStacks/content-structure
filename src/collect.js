@@ -100,8 +100,8 @@ function entry_to_url(url_type,path,slug){
 }
 
 function entry_to_level(url_type,file_path){
-    const base_level = 0
-    let level = 0
+    const base_level = 1
+    let level = 1
     const directory = dirname(file_path)
     if(![".",""].includes(directory)){
         //console.log(directory.split('/'))
