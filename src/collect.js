@@ -113,7 +113,7 @@ function entry_to_level(url_type,file_path){
         }
     }
     //console.log(`level:(${level}) path:${entry.path}`)
-    console.log(`level of '${file_path}' is ${level}`)
+    //console.log(`level of '${file_path}' is ${level}`)
     return level
 }
 
