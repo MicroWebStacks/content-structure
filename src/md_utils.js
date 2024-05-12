@@ -348,12 +348,13 @@ function get_links_info(entry,content,assets_ext){
                 if(link.url.startsWith("/")){
                     path = link.url
                 }
+                newlink.path = path
                 const ext = extname(path).slice(1)
                 if(assets_ext.includes(ext)){
-                    newlink.path = path
-                }
-                else{
-                    newlink.url = path
+                    newlink.ext = ext
+                    newlink.filter_ext = true
+                }else{
+                    newlink.filter_ext = false
                 }
             }
             links.push(newlink)
