@@ -99,6 +99,24 @@ function entry_to_url(url_type,path,slug){
     }
 }
 
+function entry_to_level(url_type,file_path){
+    const base_level = 0
+    let level = 0
+    const directory = dirname(file_path)
+    if(![".",""].includes(directory)){
+        //console.log(directory.split('/'))
+        const path_level = directory.split('/').length
+        if(url_type == "file"){
+            level = base_level + path_level + 1
+        }else{
+            level = base_level + path_level
+        }
+    }
+    //console.log(`level:(${level}) path:${entry.path}`)
+    console.log(`level of '${file_path}' is ${level}`)
+    return level
+}
+
 async function get_markdown_data(file_path){
     const url_type = (file_path.endsWith("readme.md")?"dir":"file")
     const text = await load_text(file_path)
@@ -113,6 +131,7 @@ async function get_markdown_data(file_path){
         delete data.title
     }
     const url = entry_to_url(url_type,file_path,slug)
+    const level = entry_to_level(url_type,file_path)
     let entry       = {
         sid:            sid,         //short unique id
         uid:            uid,        //unique, fallback appending -1, -2,...
@@ -123,6 +142,7 @@ async function get_markdown_data(file_path){
         format:         "markdown",
         title:          title,
         content_type:   content_type,
+        level:          level,
         ...data,
     }
     return entry
