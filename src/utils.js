@@ -151,6 +151,13 @@ function add_documents(asset_map,documents){
   return output_map
 }
 
+function file_ext(url){
+  url = url.split('?')[0].split('#')[0];
+  const filename = url.substring(url.lastIndexOf('/') + 1);
+  const lastDotIndex = filename.lastIndexOf('.');
+  return (lastDotIndex === -1) ? '' : filename.substring(lastDotIndex + 1)
+}
+
 export{
     relAssetToUrl,
     check_dir_create,
@@ -163,5 +170,6 @@ export{
     load_json,
     load_text,
     list_to_map,
-    add_documents
+    add_documents,
+    file_ext
 }

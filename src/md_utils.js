@@ -1,5 +1,5 @@
 import slugify from 'slugify'
-import { get_next_uid,load_text } from './utils.js'
+import { file_ext, get_next_uid,load_text } from './utils.js'
 import {visit} from "unist-util-visit";
 import {dirname, basename,parse, extname} from 'path'
 import {remark} from 'remark'
@@ -333,13 +333,16 @@ function get_links_info(entry,content,assets_ext){
         for(const link of content.links){
             const external = link.url.startsWith('http')
             const uid = `${entry.uid}#${link.id}`
+            const ext = file_ext(path)
             let newlink = {
                 type:"link",
                 uid:uid,
                 sid:shortMD5(uid),
                 text:link.text,
                 document:entry.sid,
-                external:external
+                external:external,
+                ext: ext,
+                filter_ext: assets_ext.includes(ext)
             }
             if(external){
                 newlink.url = link.url
@@ -349,13 +352,6 @@ function get_links_info(entry,content,assets_ext){
                     path = link.url
                 }
                 newlink.path = path
-                const ext = extname(path).slice(1)
-                if(assets_ext.includes(ext)){
-                    newlink.ext = ext
-                    newlink.filter_ext = true
-                }else{
-                    newlink.filter_ext = false
-                }
             }
             links.push(newlink)
         }
