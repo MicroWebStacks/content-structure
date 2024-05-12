@@ -333,7 +333,7 @@ function get_links_info(entry,content,assets_ext){
         for(const link of content.links){
             const external = link.url.startsWith('http')
             const uid = `${entry.uid}#${link.id}`
-            const ext = file_ext(path)
+            const ext = file_ext(link.url)
             let newlink = {
                 type:"link",
                 uid:uid,
