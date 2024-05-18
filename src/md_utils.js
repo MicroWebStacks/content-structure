@@ -352,6 +352,8 @@ function get_links_info(entry,content,assets_ext){
                     path = link.url
                 }
                 newlink.path = path
+
+                //hash:shortMD5(code.text),
             }
             links.push(newlink)
         }

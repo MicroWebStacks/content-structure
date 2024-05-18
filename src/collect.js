@@ -235,16 +235,31 @@ async function parse_document(entry){
 }
 
 async function check_add_assets(asset_list,content_assets){
+    const config = get_config()
     const referenced_locals = new Set()
     for(const asset of asset_list){
         if(Object.hasOwn(asset,"path")){
             referenced_locals.add(asset.path)
+            let asset_exist = false
+            let abs_path = ""
             if(asset.path.startsWith("/")){
-                if(!await exists_public(asset.path)){
+                if(await exists_public(asset.path)){
+                    asset_exist = true
+                    abs_path = join(config.rootdir,"public",asset.path)
+                }else{
                     warn(`(X) asset does not exist in public '${asset.path}'`)
                 }
-            }else if(!await exists(asset.path)){
-                warn(`(X) asset does not exist in content '${asset.path}'`)
+            }else{
+                if(await exists(asset.path)){
+                    asset_exist = true
+                    abs_path = join(config.contentdir,asset.path)
+                }else{
+                    warn(`(X) asset does not exist in content '${asset.path}'`)
+                }
+            }
+            asset.exists = asset_exist
+            if(asset.exists){
+                asset.abs_path = abs_path
             }
         }
     }
