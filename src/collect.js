@@ -246,20 +246,23 @@ async function check_add_assets(asset_list,content_assets){
                 if(await exists_public(asset.path)){
                     asset_exist = true
                     abs_path = join(config.rootdir,"public",asset.path)
-                }else{
-                    warn(`(X) asset does not exist in public '${asset.path}'`)
                 }
             }else{
                 if(await exists(asset.path)){
                     asset_exist = true
                     abs_path = join(config.contentdir,asset.path)
-                }else{
-                    warn(`(X) asset does not exist in content '${asset.path}'`)
                 }
             }
-            asset.exists = asset_exist
-            if(asset.exists){
+            //existence only relevant if really found anyway or for known extensions
+            //otherwise it could be just a URL abs link
+            if(asset_exist){
+                asset.exists = asset_exist
                 asset.abs_path = abs_path
+            }else{
+                if(asset.filter_ext){
+                    asset.exists = asset_exist
+                    warn(`(X) asset from filter ext does not exist '${asset.path}'`)
+                }
             }
         }
     }

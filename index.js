@@ -1,7 +1,7 @@
 import {join} from 'path'
 import { save_json,load_json,check_dir_create, list_to_map,add_documents } from './src/utils.js';
 import {get_images_info,get_codes_info,get_tables_info,
-        get_links_info,get_refs_info} from './src/md_utils.js'
+        get_links_assets_info,get_refs_info} from './src/md_utils.js'
 import {parse_document,collect_documents_data,
         get_all_files, set_config,parse_markdown,
         check_add_assets} from './src/collect.js'
@@ -29,7 +29,7 @@ async function collect(config){
             asset_list.push(...get_images_info(entry,content))
             asset_list.push(...get_tables_info(entry,content))
             asset_list.push(...get_codes_info(entry,content))
-            asset_list.push(...get_links_info(entry,content,config.assets_ext))
+            asset_list.push(...get_links_assets_info(entry,content,config.assets_ext))
             await check_dir_create(dir)
             await save_json(tree,join(dir,"tree.json"))
             await save_json(content,join(dir,"content.json"))

@@ -327,7 +327,7 @@ function extract_links(tree,headings){
     return links_list
 }
 
-function get_links_info(entry,content,assets_ext){
+function get_links_assets_info(entry,content,assets_ext){
     const links = []    
     if(content.links.length > 0){
         for(const link of content.links){
@@ -352,7 +352,6 @@ function get_links_info(entry,content,assets_ext){
                     path = link.url
                 }
                 newlink.path = path
-
                 //hash:shortMD5(code.text),
             }
             links.push(newlink)
@@ -424,6 +423,6 @@ export{
     get_images_info,
     get_tables_info,
     get_codes_info,
-    get_links_info,
+    get_links_assets_info,
     get_refs_info
 }
