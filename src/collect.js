@@ -91,8 +91,11 @@ async function get_all_files(ext_list){
 
 function entry_to_url(url_type,path,slug){
     if(url_type == "dir"){
-        const dir = dirname(dirname(path))
-        return join(dir, slug).replaceAll('\\','/')
+        const dir = dirname(path)
+        if(dir == "."){
+            return ""
+        }
+        return dir.replaceAll('\\','/')
     }else{
         const parsedPath = parse(path)
         return join(parsedPath.dir, slug).replaceAll('\\','/')
@@ -117,8 +120,26 @@ function entry_to_level(url_type,file_path){
     return level
 }
 
+function isFilenameSameAsParent(filePath) {
+    const filename = basename(filePath, extname(filePath));
+    const parentDirName = basename(dirname(filePath));
+    return filename === parentDirName;
+}
+
+function get_url_type(file_path){
+    if(file_path.toLowerCase().endsWith("readme.md")){
+        return "dir"
+    }else{
+        if(isFilenameSameAsParent(file_path)){
+            return "dir"
+        }else{
+            return "file"
+        }
+    }
+}
+
 async function get_markdown_data(file_path){
-    const url_type = (file_path.endsWith("readme.md")?"dir":"file")
+    const url_type = get_url_type(file_path)
     const text = await load_text(file_path)
     const {content, data} = matter(text)
 
