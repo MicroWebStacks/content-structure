@@ -1,8 +1,6 @@
 # Content Structure
 content-structure collects all your markdown files meta data and parses the Abstract Syntax Tree of each file
 
-! note this project is just starting and is not yet generating all planned artefacts, minor versions can still have breaking changes !
-
 # Usage
 ```shell
 npm install content-structure
