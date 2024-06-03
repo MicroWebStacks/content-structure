@@ -5,6 +5,8 @@ content-structure collects all your markdown files meta data and parses the Abst
 ```shell
 npm install content-structure
 ```
+this project is a library, for full config, see the example in [example/parse.js](example/parse.js)
+
 collect all data by running this once
 ```javascript
 import {collect} from 'content-structure'
