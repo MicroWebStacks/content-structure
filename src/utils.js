@@ -12,45 +12,6 @@ function isNewer(filepath,targetfile){
   return (t1>t2)
 }
 
-//Note 'imp*ort.me*ta.en*v.BA*SE_URL' only works from Astro component not from remark-rel-asset plugin
-function relAssetToUrl(relativepath,refFile){
-  const refdir = join("content",dirname(refFile))
-    let newurl = relativepath
-    const filepath = join(refdir,relativepath)
-    console.log(`relAssetToUrl> filepath = ${filepath}`)
-    if(existsSync(filepath)){
-      //console.log(`   * impo*rt.me*ta.ur*l = ${import.meta.url}`)
-      const config = get_config()
-      let outdir = config.outdir
-      if(import.meta.env.MODE == "development"){
-        outdir = join(config.rootdir,"public")
-      }
-      const targetroot = join(outdir,"raw")
-      const filerootrel = relative(config.rootdir,refdir)
-      const targetpath = resolve(targetroot,filerootrel)
-      const targetfile = join(targetpath,relativepath)
-      const targetdir = dirname(targetfile)
-      //console.log(`copy from '${filepath}' to '${targetfile}'`)
-      const newpath = join("raw/",filerootrel,relativepath)
-      newurl = newpath.replaceAll('\\','/')
-      if(!existsSync(targetdir)){
-        mkdirSync(targetdir,{ recursive: true })
-      }
-      if(!existsSync(targetfile)){
-        copyFileSync(filepath,targetfile)
-        console.log(`utils.js> * new asset url = '${newurl}'`)
-      }
-      else if(isNewer(filepath,targetfile)){
-        copyFileSync(filepath,targetfile)
-        console.log(`utils.js> * updated asset url = '${newurl}'`)
-      }else{
-        console.log(`utils.js> * existing asset url = '${newurl}'`)
-      }
-    }
-
-    return newurl
-}
-
 async function check_dir_create(dirname){
   const config = get_config()
   const abs_dir = join(config.outdir,dirname)
@@ -159,7 +120,6 @@ function file_ext(url){
 }
 
 export{
-    relAssetToUrl,
     check_dir_create,
     save_json,
     get_next_uid,
