@@ -153,7 +153,7 @@ function md_tree(content) {
     return new_markdownAST;
 }
 
-function extract_headings(tree){
+function extract_headings(tree,doc_uid){
     let headings_list = []
     let heading_slug_list = []
     visit(tree, node=> {
@@ -162,9 +162,12 @@ function extract_headings(tree){
             const heading_slug = title_slug(heading_text)
             const unique_heading_slug = get_next_uid(heading_slug,heading_slug_list)
             heading_slug_list.push(unique_heading_slug)
+            const uid = doc_uid+"#"+unique_heading_slug
             headings_list.push({
                 label:heading_text,
                 slug:unique_heading_slug,
+                uid: uid,
+                sid:shortMD5(uid),
                 depth:node.depth,
                 line:node.position.start.line
             })

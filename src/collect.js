@@ -218,7 +218,7 @@ async function tree_content(markdown_text,entry_details){
     const config = get_config()
     const {content, data} = matter(markdown_text)
     const tree = md_tree(content)
-    const headings = extract_headings(tree)
+    const headings = extract_headings(tree,entry_details.uid)
     entry_details.headings = headings
     const tables = extract_tables(tree,headings,entry_details)
     entry_details.tables = tables
