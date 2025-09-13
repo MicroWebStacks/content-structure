@@ -1,6 +1,9 @@
 # Content Structure
 content-structure collects all your markdown files meta data and parses the Abstract Syntax Tree of each file
 
+## deepwiki
+https://deepwiki.com/MicroWebStacks/content-structure
+
 # Usage
 ```shell
 npm install content-structure
