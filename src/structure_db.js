@@ -1,147 +1,108 @@
 import { join } from 'path';
-import { check_dir_create } from './utils.js';
+import { check_dir_create, load_yaml_code } from './utils.js';
 import { get_config, shortMD5 } from './collect.js';
 import { warn } from './libs/log.js';
-import { openDatabase, ensureTable, clearTable, ensureColumn, insertRows, runInTransaction } from './sqlite_utils/index.js';
-
-const DOCUMENT_TABLE_SQL = `
-    sid TEXT PRIMARY KEY,
-    uid TEXT NOT NULL,
-    path TEXT NOT NULL,
-    url TEXT,
-    url_type TEXT,
-    slug TEXT,
-    format TEXT,
-    title TEXT,
-    content_type TEXT,
-    level INTEGER,
-    headings_list TEXT NOT NULL,
-    links_list TEXT NOT NULL,
-    references_list TEXT NOT NULL,
-    image_sid_list TEXT NOT NULL,
-    table_sid_list TEXT NOT NULL,
-    code_sid_list TEXT NOT NULL,
-    paragraph_sid_list TEXT NOT NULL
-`;
-
-const ASSET_TABLE_SQL = `
-    sid TEXT PRIMARY KEY,
-    uid TEXT NOT NULL,
-    type TEXT NOT NULL,
-    document_sid TEXT,
-    path TEXT,
-    url TEXT,
-    text TEXT,
-    external INTEGER,
-    ext TEXT,
-    filter_ext INTEGER,
-    "exists" INTEGER,
-    abs_path TEXT,
-    hash TEXT,
-    language TEXT
-`;
-
-const TABLES_TABLE_SQL = `
-    sid TEXT PRIMARY KEY,
-    uid TEXT NOT NULL,
-    document_sid TEXT NOT NULL,
-    heading TEXT,
-    text TEXT,
-    data_list TEXT NOT NULL,
-    order_index INTEGER
-`;
-
-const IMAGES_TABLE_SQL = `
-    sid TEXT PRIMARY KEY,
-    uid TEXT NOT NULL,
-    document_sid TEXT NOT NULL,
-    slug TEXT,
-    source_sid TEXT,
-    heading TEXT,
-    title TEXT,
-    alt TEXT,
-    url TEXT,
-    text_list TEXT NOT NULL,
-    references_list TEXT NOT NULL,
-    order_index INTEGER
-`;
-
-const CODE_TABLE_SQL = `
-    sid TEXT PRIMARY KEY,
-    uid TEXT NOT NULL,
-    document_sid TEXT NOT NULL,
-    heading TEXT,
-    language TEXT,
-    text TEXT,
-    hash TEXT,
-    order_index INTEGER
-`;
-
-const PARAGRAPH_TABLE_SQL = `
-    sid TEXT PRIMARY KEY,
-    uid TEXT NOT NULL,
-    document_sid TEXT NOT NULL,
-    heading TEXT,
-    text TEXT,
-    order_index INTEGER
-`;
-
-const REFERENCES_TABLE_SQL = `
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    source_type TEXT,
-    source_sid TEXT,
-    source_heading TEXT,
-    target_type TEXT,
-    target_uid TEXT,
-    target_sid TEXT
-`;
-
-const DOCUMENT_BASE_FIELDS = new Set([
-    'sid',
-    'uid',
-    'path',
-    'url',
-    'url_type',
-    'slug',
-    'format',
-    'title',
-    'content_type',
-    'level',
-    'headings_list',
-    'links_list',
-    'references_list',
-    'image_sid_list',
-    'table_sid_list',
-    'code_sid_list',
-    'paragraph_sid_list'
-]);
-
-const DOCUMENT_BASE_COLUMN_ORDER = [
-    'sid',
-    'uid',
-    'path',
-    'url',
-    'url_type',
-    'slug',
-    'format',
-    'title',
-    'content_type',
-    'level',
-    'headings_list',
-    'links_list',
-    'references_list',
-    'image_sid_list',
-    'table_sid_list',
-    'code_sid_list',
-    'paragraph_sid_list'
-];
+import { openDatabase, ensureTable, clearTable, insertRows, runInTransaction } from './sqlite_utils/index.js';
 
 const DB_FILENAME = 'structure.db';
+const CATALOG_PATH = 'catalog.yaml';
+const STRUCTURE_DATASET_NAME = 'structure';
+const LIST_COLUMN_TYPES = new Set(['string_list', 'object_list']);
+
+let structureSchemaPromise;
+
+async function getStructureSchema() {
+    if (!structureSchemaPromise) {
+        structureSchemaPromise = loadStructureSchema();
+    }
+    return structureSchemaPromise;
+}
+
+async function loadStructureSchema() {
+    const catalog = await load_yaml_code(CATALOG_PATH);
+    const dataset = catalog?.datasets?.find((entry) => entry.name === STRUCTURE_DATASET_NAME);
+    if (!dataset) {
+        throw new Error(`catalog.yaml missing dataset '${STRUCTURE_DATASET_NAME}'`);
+    }
+    const tables = new Map();
+    for (const table of dataset.tables ?? []) {
+        const normalized = normalizeTableSchema(table);
+        tables.set(normalized.name, normalized);
+    }
+    return { tables };
+}
+
+function normalizeTableSchema(table) {
+    const columns = (table.columns ?? []).map((column) => normalizeColumnSchema(column));
+    return {
+        name: table.name,
+        columns,
+        columnLookup: new Map(columns.map((column) => [column.name, column])),
+        insertColumns: columns.filter((column) => !column.autoIncrement).map((column) => column.name),
+        createSql: buildCreateSql(columns)
+    };
+}
+
+function normalizeColumnSchema(column) {
+    const type = column.type ?? 'string';
+    const sqliteType = mapColumnTypeToSqlite(type);
+    const isList = LIST_COLUMN_TYPES.has(type);
+    const autoIncrement = column.autoincrement ?? (column.primary && type === 'int' && column.name === 'id');
+    return {
+        ...column,
+        type,
+        sqliteType,
+        isList,
+        autoIncrement
+    };
+}
+
+function buildCreateSql(columns) {
+    return columns.map((column) => buildColumnSql(column)).join(',\n        ');
+}
+
+function buildColumnSql(column) {
+    let sql = `"${column.name}" ${column.sqliteType}`;
+    if (column.primary) {
+        if (column.sqliteType === 'INTEGER' && column.autoIncrement) {
+            sql += ' PRIMARY KEY AUTOINCREMENT';
+        } else {
+            sql += ' PRIMARY KEY';
+        }
+    }
+    return sql;
+}
+
+function mapColumnTypeToSqlite(type) {
+    switch (type) {
+        case 'int':
+        case 'boolean':
+            return 'INTEGER';
+        default:
+            return 'TEXT';
+    }
+}
+
+function requireTableSchema(schema, tableName) {
+    const table = schema.tables.get(tableName);
+    if (!table) {
+        throw new Error(`catalog.yaml missing table '${tableName}' in dataset '${STRUCTURE_DATASET_NAME}'`);
+    }
+    return table;
+}
 
 async function writeStructureDb({documents, assets, references, documentContents}) {
     const config = get_config();
     await check_dir_create('');
     const dbPath = join(config.outdir, DB_FILENAME);
+    const schema = await getStructureSchema();
+    const documentsSchema = requireTableSchema(schema, 'documents');
+    const tablesSchema = requireTableSchema(schema, 'tables');
+    const imagesSchema = requireTableSchema(schema, 'images');
+    const codeSchema = requireTableSchema(schema, 'code');
+    const paragraphsSchema = requireTableSchema(schema, 'paragraphs');
+    const assetsSchema = requireTableSchema(schema, 'assets');
+    const referencesSchema = requireTableSchema(schema, 'references');
     let db;
     try {
         db = openDatabase(dbPath);
@@ -150,38 +111,30 @@ async function writeStructureDb({documents, assets, references, documentContents
         return;
     }
     runInTransaction(db, () => {
-        createTables(db);
-        resetTables(db);
+        createTables(db, schema);
+        resetTables(db, schema);
         const contentMap = normalizeContentMap(documentContents);
-        const {docRows, tableRows, imageRows, codeRows, paragraphRows} = buildDocumentPayloads(documents, contentMap);
-        persistDocuments(db, docRows);
-        persistSimpleRows(db, 'tables', ['sid', 'uid', 'document_sid', 'heading', 'text', 'data_list', 'order_index'], tableRows);
-        persistSimpleRows(db, 'images', ['sid', 'uid', 'document_sid', 'slug', 'source_sid', 'heading', 'title', 'alt', 'url', 'text_list', 'references_list', 'order_index'], imageRows);
-        persistSimpleRows(db, 'code', ['sid', 'uid', 'document_sid', 'heading', 'language', 'text', 'hash', 'order_index'], codeRows);
-        persistSimpleRows(db, 'paragraphs', ['sid', 'uid', 'document_sid', 'heading', 'text', 'order_index'], paragraphRows);
-        persistAssets(db, assets ?? []);
-        persistReferences(db, references ?? []);
+        const {docRows, tableRows, imageRows, codeRows, paragraphRows} = buildDocumentPayloads(documents, contentMap, documentsSchema);
+        persistDocuments(db, docRows, documentsSchema);
+        persistSimpleRows(db, 'tables', tablesSchema.insertColumns, tableRows);
+        persistSimpleRows(db, 'images', imagesSchema.insertColumns, imageRows);
+        persistSimpleRows(db, 'code', codeSchema.insertColumns, codeRows);
+        persistSimpleRows(db, 'paragraphs', paragraphsSchema.insertColumns, paragraphRows);
+        persistAssets(db, assets ?? [], assetsSchema);
+        persistReferences(db, references ?? [], referencesSchema);
     });
 }
 
-function createTables(db) {
-    ensureTable(db, 'documents', DOCUMENT_TABLE_SQL);
-    ensureTable(db, 'assets', ASSET_TABLE_SQL);
-    ensureTable(db, 'tables', TABLES_TABLE_SQL);
-    ensureTable(db, 'images', IMAGES_TABLE_SQL);
-    ensureTable(db, 'code', CODE_TABLE_SQL);
-    ensureTable(db, 'paragraphs', PARAGRAPH_TABLE_SQL);
-    ensureTable(db, 'references', REFERENCES_TABLE_SQL);
+function createTables(db, schema) {
+    for (const table of schema.tables.values()) {
+        ensureTable(db, table.name, table.createSql);
+    }
 }
 
-function resetTables(db) {
-    clearTable(db, 'documents');
-    clearTable(db, 'assets');
-    clearTable(db, 'tables');
-    clearTable(db, 'images');
-    clearTable(db, 'code');
-    clearTable(db, 'paragraphs');
-    clearTable(db, 'references');
+function resetTables(db, schema) {
+    for (const table of schema.tables.values()) {
+        clearTable(db, table.name);
+    }
 }
 
 function normalizeContentMap(documentContents) {
@@ -194,7 +147,7 @@ function normalizeContentMap(documentContents) {
     return new Map(Object.entries(documentContents));
 }
 
-function buildDocumentPayloads(documents, contentMap) {
+function buildDocumentPayloads(documents, contentMap, documentSchema) {
     const docRows = [];
     const tableRows = [];
     const imageRows = [];
@@ -202,7 +155,7 @@ function buildDocumentPayloads(documents, contentMap) {
     const paragraphRows = [];
     for (const doc of documents) {
         const content = contentMap.get(doc.sid);
-        const {row, tables, images, code, paragraphs} = buildDocumentRow(doc, content);
+        const {row, tables, images, code, paragraphs} = buildDocumentRow(doc, content, documentSchema);
         docRows.push(row);
         tableRows.push(...tables);
         imageRows.push(...images);
@@ -212,27 +165,20 @@ function buildDocumentPayloads(documents, contentMap) {
     return {docRows, tableRows, imageRows, codeRows, paragraphRows};
 }
 
-function buildDocumentRow(doc, content) {
-    const row = {};
-    for (const column of DOCUMENT_BASE_COLUMN_ORDER) {
-        if (column === 'level') {
-            row[column] = doc.level ?? null;
-        } else {
-            row[column] = doc[column] ?? null;
-        }
-    }
-    appendDocumentExtras(doc, row);
+function buildDocumentRow(doc, content, documentSchema) {
     const tablesResult = buildTableRows(doc, content?.tables ?? []);
     const imagesResult = buildImageRows(doc, content?.images ?? []);
     const codeResult = buildCodeRows(doc, content?.code ?? []);
     const paragraphsResult = buildParagraphRows(doc, content?.paragraphs ?? []);
-    row.headings_list = serializeList(content?.headings ?? []);
-    row.links_list = serializeList(content?.links ?? []);
-    row.references_list = serializeList(content?.references ?? []);
-    row.image_sid_list = serializeList(imagesResult.sids);
-    row.table_sid_list = serializeList(tablesResult.sids);
-    row.code_sid_list = serializeList(codeResult.sids);
-    row.paragraph_sid_list = serializeList(paragraphsResult.sids);
+    const row = {};
+    for (const column of documentSchema.columns) {
+        row[column.name] = getDocumentColumnValue(column, doc, content, {
+            tablesResult,
+            imagesResult,
+            codeResult,
+            paragraphsResult
+        });
+    }
     return {
         row,
         tables: tablesResult.rows,
@@ -242,21 +188,48 @@ function buildDocumentRow(doc, content) {
     };
 }
 
-function appendDocumentExtras(doc, row) {
-    for (const [key, value] of Object.entries(doc)) {
-        if (DOCUMENT_BASE_FIELDS.has(key) || value === undefined) {
-            continue;
-        }
-        if (Array.isArray(value)) {
-            const columnName = key.endsWith('_list') ? key : `${key}_list`;
-            row[columnName] = serializeList(value);
-        } else if (value !== null && typeof value === 'object') {
-            const columnName = key.endsWith('_list') ? key : `${key}_list`;
-            row[columnName] = serializeList([value]);
-        } else {
-            row[key] = normalizeScalar(value);
-        }
+function getDocumentColumnValue(column, doc, content, derived) {
+    switch (column.name) {
+        case 'headings_list':
+            return formatColumnValue(column, content?.headings ?? []);
+        case 'links_list':
+            return formatColumnValue(column, content?.links ?? []);
+        case 'references_list':
+            return formatColumnValue(column, content?.references ?? []);
+        case 'image_sid_list':
+            return formatColumnValue(column, derived.imagesResult.sids);
+        case 'table_sid_list':
+            return formatColumnValue(column, derived.tablesResult.sids);
+        case 'code_sid_list':
+            return formatColumnValue(column, derived.codeResult.sids);
+        case 'paragraph_sid_list':
+            return formatColumnValue(column, derived.paragraphsResult.sids);
+        default:
+            return formatColumnValue(column, doc[column.name]);
     }
+}
+
+function formatColumnValue(column, value) {
+    if (column.isList) {
+        return serializeList(normalizeListValue(value));
+    }
+    if (value === undefined) {
+        return null;
+    }
+    if (column.type === 'boolean') {
+        return normalizeScalar(value);
+    }
+    return value ?? null;
+}
+
+function normalizeListValue(value) {
+    if (Array.isArray(value)) {
+        return value;
+    }
+    if (value === null || value === undefined) {
+        return [];
+    }
+    return [value];
 }
 
 function buildTableRows(doc, tables) {
@@ -341,20 +314,11 @@ function buildParagraphRows(doc, paragraphs) {
     return {rows, sids};
 }
 
-function persistDocuments(db, rows) {
+function persistDocuments(db, rows, documentSchema) {
     if (!rows.length) {
         return;
     }
-    const columnSet = new Set(DOCUMENT_BASE_COLUMN_ORDER);
-    for (const row of rows) {
-        for (const key of Object.keys(row)) {
-            if (!columnSet.has(key)) {
-                ensureColumn(db, 'documents', key, 'TEXT');
-                columnSet.add(key);
-            }
-        }
-    }
-    insertRows(db, 'documents', Array.from(columnSet), rows);
+    insertRows(db, 'documents', documentSchema.insertColumns, rows);
 }
 
 function persistSimpleRows(db, tableName, columns, rows) {
@@ -364,7 +328,7 @@ function persistSimpleRows(db, tableName, columns, rows) {
     insertRows(db, tableName, columns, rows);
 }
 
-function persistAssets(db, assets) {
+function persistAssets(db, assets, assetsSchema) {
     if (!assets.length) {
         return;
     }
@@ -384,19 +348,14 @@ function persistAssets(db, assets) {
         hash: asset.hash ?? null,
         language: asset.language ?? null
     }));
-    insertRows(db, 'assets', ['sid', 'uid', 'type', 'document_sid', 'path', 'url', 'text', 'external', 'ext', 'filter_ext', 'exists', 'abs_path', 'hash', 'language'], rows);
+    insertRows(db, 'assets', assetsSchema.insertColumns, rows);
 }
 
-function persistReferences(db, references) {
+function persistReferences(db, references, referencesSchema) {
     if (!references.length) {
         return;
     }
-    insertRows(
-        db,
-        'references',
-        ['source_type', 'source_sid', 'source_heading', 'target_type', 'target_uid', 'target_sid'],
-        references
-    );
+    insertRows(db, 'references', referencesSchema.insertColumns, references);
 }
 
 function serializeList(list) {

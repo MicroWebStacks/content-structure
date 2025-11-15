@@ -76,6 +76,19 @@ async function load_yaml(rel_path){
   return data;
 }
 
+async function load_yaml_code(rel_path){
+  let currentPath = decodeURIComponent(new URL(import.meta.url).pathname)
+  // Remove leading slash on Windows (e.g., /D:/... becomes D:/...)
+  if (process.platform === 'win32' && currentPath.match(/^\/[a-zA-Z]:\//)) {
+    currentPath = currentPath.substring(1)
+  }
+  const currentDir = dirname(currentPath)
+  const parentRoot = dirname(currentDir)
+  const path = join(parentRoot, rel_path)
+  const fileContent = await readFile(path,'utf8')
+  return yaml.load(fileContent)
+}
+
 // content dir =>
 async function load_json(rel_path,dir="content"){
   const config = get_config()
@@ -127,6 +140,7 @@ export{
     exists_public,
     exists_abs,
     load_yaml,
+    load_yaml_code,
     load_json,
     load_text,
     list_to_map,
