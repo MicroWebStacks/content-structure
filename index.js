@@ -23,19 +23,17 @@ async function collect(config){
     const documentContents = new Map()
 
     const asset_list = []
+    await check_dir_create("ast")
     for(const entry of documents){
         if(entry.format.startsWith("markdown")){
             debug(` parsing sid: ${entry.sid} path: ${entry.path}`)
             const {tree,content} = await parse_document(entry)
             documentContents.set(entry.sid, content)
-            const dir = join("documents",entry.sid)
             asset_list.push(...get_images_info(entry,content))
             asset_list.push(...get_tables_info(entry,content))
             asset_list.push(...get_codes_info(entry,content))
             asset_list.push(...get_links_assets_info(entry,content,config.assets_ext))
-            await check_dir_create(dir)
-            await save_json(tree,join(dir,"tree.json"))
-            await save_json(content,join(dir,"content.json"))
+            await save_json(tree,join("ast",`${entry.sid}.json`))
             entry.references = content.references
             entry.images = content.images
         }
@@ -54,19 +52,6 @@ async function collect(config){
         }
     }
 
-    await check_dir_create("")//even root dir might need creation, in case of empty docs
-    const ids = {}
-    Object.entries(all_items_map).forEach(([key, value]) => {
-            ids[key] = value.uid
-        });
-    await save_json(ids,"ids.json")
-    green_log(`saved ids.json with ${Object.keys(ids).length} ids (documents+assets)`)
-    await save_json(documents,"document_list.json")
-    green_log(`saved document_list.json with ${documents.length} documents`)
-    await save_json(asset_list,"asset_list.json")
-    green_log(`saved asset_list.json with ${asset_list.length} assets`)
-    await save_json(reference_list,"reference_list.json")
-    green_log(`saved reference_list.json with ${reference_list.length} references`)
     await writeStructureDb({
         documents,
         assets: asset_list,
@@ -102,11 +87,10 @@ async function getEntry(filter){
             console.warn(` X more than one document found, returning first for : '${JSON.stringify(filter)}'`)
         }
         const entry_data = filetred_documents[0]
-        const data = await load_json(join("documents",entry_data.sid,"content.json"),"output")
-        const tree = await load_json(join("documents",entry_data.sid,"tree.json"),"output")
-        return {tree,data}
+        const tree = await load_json(join("ast",`${entry_data.sid}.json`),"output")
+        return {tree}
     }
-    return {tree:{},data:{}}
+    return {tree:{}}
 }
 
 export{
