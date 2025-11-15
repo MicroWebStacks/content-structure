@@ -6,6 +6,7 @@ import {parse_document,collect_documents_data,
         get_all_files, set_config,parse_markdown,
         check_add_assets} from './src/collect.js'
 import { debug,green_log } from './src/libs/log.js';
+import { writeStructureDb } from './src/structure_db.js';
 
 async function collect(config){
 
@@ -19,12 +20,14 @@ async function collect(config){
     set_config(config)
     const files_paths = await get_all_files(config.content_ext)
     const documents = await collect_documents_data(files_paths)
+    const documentContents = new Map()
 
     const asset_list = []
     for(const entry of documents){
         if(entry.format.startsWith("markdown")){
             debug(` parsing sid: ${entry.sid} path: ${entry.path}`)
             const {tree,content} = await parse_document(entry)
+            documentContents.set(entry.sid, content)
             const dir = join("documents",entry.sid)
             asset_list.push(...get_images_info(entry,content))
             asset_list.push(...get_tables_info(entry,content))
@@ -64,6 +67,12 @@ async function collect(config){
     green_log(`saved asset_list.json with ${asset_list.length} assets`)
     await save_json(reference_list,"reference_list.json")
     green_log(`saved reference_list.json with ${reference_list.length} references`)
+    await writeStructureDb({
+        documents,
+        assets: asset_list,
+        references: reference_list,
+        documentContents
+    })
 }
 
 function filter_documents(data,filterCriteria) {

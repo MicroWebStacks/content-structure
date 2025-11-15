@@ -118,6 +118,9 @@ the config parameter is optional and do have default values
 * each markdown file gets a `./gen/documents/<sid>` directors with
     * `tree.json` the raw output of the remark AST parser
     * content.json with the parameters and parsed content parameters
+* `.structure/structure.db` : a SQLite database (powered by better-sqlite3) that mirrors the JSON output.  
+  The database exposes the tables `documents`, `assets`, `references`, `tables`, `images`, `code`, and `paragraphs`.  
+  Repeating values are normalised into dedicated tables, while any retained list uses a `*_list` column that stores a JSON string of the related ids (for example `image_sid_list` on `documents`).  Images in the database now use UIDs shaped as `<document uid>@<image id>` so that related records can be joined through short `sid` hashes.
 
 ## Example generated output
 
