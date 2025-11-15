@@ -5,11 +5,11 @@
   "description": "a test example for content-structure",
   "main": "test.js",
   "scripts": {
-    "test": "node test.js"
+    "demo": "node parse.js"
   },
   "author": "wassfila",
   "license": "MIT",
   "dependencies": {
-    "content-structure": "file:../"
+    "content-structure": "workspace:*"
   }
 }

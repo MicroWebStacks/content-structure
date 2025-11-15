@@ -5,7 +5,7 @@
   "description": "Content Structure collect all your markdown files meta data and parses the Abstract Syntax Tree of each file",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "demo": "pnpm --filter content-structure-example demo"
   },
   "dependencies": {
     "glob": "^10.3.10",
