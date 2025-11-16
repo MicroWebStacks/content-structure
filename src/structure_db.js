@@ -109,6 +109,7 @@ async function createStructureDbWriter() {
     const codeSchema = requireTableSchema(schema, 'code');
     const paragraphsSchema = requireTableSchema(schema, 'paragraphs');
     const assetsSchema = requireTableSchema(schema, 'assets');
+    const blobsSchema = requireTableSchema(schema, 'blobs');
     const referencesSchema = requireTableSchema(schema, 'references');
     runInTransaction(db, () => {
         createTables(db, schema);
@@ -130,6 +131,9 @@ async function createStructureDbWriter() {
             const payload = buildDocumentRow(entry, content, documentsSchema);
             insertDocumentTx(payload);
         },
+        insertBlobs(blobsList = []) {
+            persistBlobs(db, blobsList, blobsSchema);
+        },
         insertAssets(assetsList = []) {
             persistAssets(db, assetsList, assetsSchema);
         },
@@ -139,7 +143,7 @@ async function createStructureDbWriter() {
     };
 }
 
-async function writeStructureDb({documents = [], assets = [], references = [], documentContents}) {
+async function writeStructureDb({documents = [], assets = [], blobs = [], references = [], documentContents}) {
     const writer = await createStructureDbWriter();
     if (!writer) {
         return;
@@ -151,6 +155,9 @@ async function writeStructureDb({documents = [], assets = [], references = [], d
     }
     if (assets.length) {
         writer.insertAssets(assets);
+    }
+    if (blobs.length) {
+        writer.insertBlobs(blobs);
     }
     if (references.length) {
         writer.insertReferences(references);
@@ -365,22 +372,31 @@ function persistAssets(db, assets, assetsSchema, options) {
         return;
     }
     const rows = assets.map((asset) => ({
-        sid: asset.sid,
         uid: asset.uid,
-        type: asset.type,
-        document_sid: asset.document ?? null,
+        blob_hash: asset.blob_hash ?? null,
+        parent_doc_uid: asset.parent_doc_uid ?? null,
         path: asset.path ?? null,
-        url: asset.url ?? null,
-        text: asset.text ?? null,
-        external: normalizeScalar(asset.external),
         ext: asset.ext ?? null,
-        filter_ext: normalizeScalar(asset.filter_ext),
-        exists: normalizeScalar(asset.exists),
-        abs_path: asset.abs_path ?? null,
-        hash: asset.hash ?? null,
-        language: asset.language ?? null
+        first_seen: asset.first_seen ?? null,
+        last_seen: asset.last_seen ?? null
     }));
     insertRows(db, 'assets', assetsSchema.insertColumns, rows, options);
+}
+
+function persistBlobs(db, blobs, blobsSchema, options) {
+    if (!blobs.length) {
+        return;
+    }
+    const rows = blobs.map((blob) => ({
+        hash: blob.hash,
+        size: blob.size ?? null,
+        first_seen: blob.first_seen ?? null,
+        last_seen: blob.last_seen ?? null,
+        year: blob.year ?? null,
+        month: blob.month ?? null,
+        prefix: blob.prefix ?? null
+    }));
+    insertRows(db, 'blobs', blobsSchema.insertColumns, rows, options);
 }
 
 function persistReferences(db, references, referencesSchema, options) {

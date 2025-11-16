@@ -202,11 +202,15 @@ function get_tables_info(entry,content){
     const tables = []
     if(content.tables.length > 0){
         for(const table of content.tables){
+            const serialized = JSON.stringify(table.data ?? [])
             tables.push({
                 type:"table",
                 uid:table.uid,
                 sid:table.sid,
-                document:entry.sid
+                document:entry.sid,
+                parent_doc_uid:entry.uid,
+                blob_content:serialized,
+                ext:"json"
             })
         }
     }
@@ -252,7 +256,9 @@ function get_images_info(entry,content){
                 uid:image.uid,
                 sid:image.sid,
                 document:entry.sid,
-                path:path
+                parent_doc_uid:entry.uid,
+                path:path,
+                ext:file_ext(image.url)
             })
         }
     }
@@ -290,8 +296,10 @@ function get_codes_info(entry,content){
                 type:"code",
                 uid:code.uid,
                 sid:code.sid,
-                hash:shortMD5(code.text),
                 document:entry.sid,
+                parent_doc_uid:entry.uid,
+                blob_content:code.text ?? '',
+                ext:code.language ?? 'txt',
                 language:code.language
             })
         }
