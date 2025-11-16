@@ -217,6 +217,29 @@ function get_tables_info(entry,content){
     return tables
 }
 
+function decodeAssetPath(pathValue){
+    if(!pathValue){
+        return pathValue
+    }
+    try{
+        return decodeURIComponent(pathValue)
+    }catch(error){
+        warn(`(X) failed to decode asset path '${pathValue}': ${error.message}`)
+        return pathValue
+    }
+}
+
+function resolveDocumentAssetPath(entryPath,targetUrl){
+    if(!targetUrl){
+        return targetUrl
+    }
+    const documentDir = dirname(entryPath)
+    const rawPath = targetUrl.startsWith("/")
+        ? targetUrl
+        : join(documentDir,targetUrl).replaceAll('\\','/')
+    return decodeAssetPath(rawPath)
+}
+
 async function extract_images(tree, headings,entry) {
     const fileDir = dirname(entry.path)
     let images_slug_list = [];
@@ -247,10 +270,7 @@ function get_images_info(entry,content){
     const images = []
     if(content.images.length > 0){
         for(const image of content.images){
-            let path = join(dirname(entry.path),image.url).replaceAll('\\','/')
-            if(image.url.startsWith("/")){
-                path = image.url
-            }
+            const path = resolveDocumentAssetPath(entry.path,image.url)
             images.push({
                 type:"image",
                 uid:image.uid,
@@ -358,11 +378,7 @@ function get_links_assets_info(entry,content,assets_ext){
             if(external){
                 newlink.url = link.url
             }else{
-                let path = join(dirname(entry.path),link.url).replaceAll('\\','/')
-                if(link.url.startsWith("/")){
-                    path = link.url
-                }
-                newlink.path = path
+                newlink.path = resolveDocumentAssetPath(entry.path,link.url)
                 //hash:shortMD5(code.text),
             }
             links.push(newlink)

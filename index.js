@@ -9,6 +9,18 @@ import { debug,green_log, warn } from './src/libs/log.js';
 import { createStructureDbWriter } from './src/structure_db.js';
 import { createBlobManager } from './src/blob_manager.js';
 
+function decodePathValue(pathValue){
+    if(!pathValue){
+        return pathValue
+    }
+    try{
+        return decodeURIComponent(pathValue)
+    }catch(error){
+        warn(`(X) failed to decode path '${pathValue}': ${error.message}`)
+        return pathValue
+    }
+}
+
 async function collect(config){
 
     //enforced matches for internal cross referencing
@@ -108,7 +120,7 @@ async function annotateAssets(assets,config,referencedLocalAssets){
         }
         if(asset_exist){
             asset.exists = asset_exist
-            asset.abs_path = abs_path
+            asset.abs_path = decodePathValue(abs_path)
             if(!asset.ext){
                 asset.ext = file_ext(asset.path)
             }
