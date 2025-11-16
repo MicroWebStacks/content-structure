@@ -91,11 +91,18 @@ function requireTableSchema(schema, tableName) {
     return table;
 }
 
-async function writeStructureDb({documents, assets, references, documentContents}) {
+async function createStructureDbWriter() {
     const config = get_config();
     await check_dir_create('');
     const dbPath = join(config.outdir, DB_FILENAME);
     const schema = await getStructureSchema();
+    let db;
+    try {
+        db = openDatabase(dbPath);
+    } catch (error) {
+        warn(`(!) skipping structure.db generation: ${error.message}`);
+        return null;
+    }
     const documentsSchema = requireTableSchema(schema, 'documents');
     const tablesSchema = requireTableSchema(schema, 'tables');
     const imagesSchema = requireTableSchema(schema, 'images');
@@ -103,26 +110,51 @@ async function writeStructureDb({documents, assets, references, documentContents
     const paragraphsSchema = requireTableSchema(schema, 'paragraphs');
     const assetsSchema = requireTableSchema(schema, 'assets');
     const referencesSchema = requireTableSchema(schema, 'references');
-    let db;
-    try {
-        db = openDatabase(dbPath);
-    } catch (error) {
-        warn(`(!) skipping structure.db generation: ${error.message}`);
-        return;
-    }
     runInTransaction(db, () => {
         createTables(db, schema);
         resetTables(db, schema);
-        const contentMap = normalizeContentMap(documentContents);
-        const {docRows, tableRows, imageRows, codeRows, paragraphRows} = buildDocumentPayloads(documents, contentMap, documentsSchema);
-        persistDocuments(db, docRows, documentsSchema);
-        persistSimpleRows(db, 'tables', tablesSchema.insertColumns, tableRows);
-        persistSimpleRows(db, 'images', imagesSchema.insertColumns, imageRows);
-        persistSimpleRows(db, 'code', codeSchema.insertColumns, codeRows);
-        persistSimpleRows(db, 'paragraphs', paragraphsSchema.insertColumns, paragraphRows);
-        persistAssets(db, assets ?? [], assetsSchema);
-        persistReferences(db, references ?? [], referencesSchema);
     });
+    const insertDocumentTx = db.transaction((payload) => {
+        const {row, tables, images, code, paragraphs} = payload;
+        persistDocuments(db, [row], documentsSchema, {transaction: false});
+        persistSimpleRows(db, 'tables', tablesSchema.insertColumns, tables, {transaction: false});
+        persistSimpleRows(db, 'images', imagesSchema.insertColumns, images, {transaction: false});
+        persistSimpleRows(db, 'code', codeSchema.insertColumns, code, {transaction: false});
+        persistSimpleRows(db, 'paragraphs', paragraphsSchema.insertColumns, paragraphs, {transaction: false});
+    });
+    return {
+        insertDocument(entry, content) {
+            if (!entry) {
+                return;
+            }
+            const payload = buildDocumentRow(entry, content, documentsSchema);
+            insertDocumentTx(payload);
+        },
+        insertAssets(assetsList = []) {
+            persistAssets(db, assetsList, assetsSchema);
+        },
+        insertReferences(refList = []) {
+            persistReferences(db, refList, referencesSchema);
+        }
+    };
+}
+
+async function writeStructureDb({documents = [], assets = [], references = [], documentContents}) {
+    const writer = await createStructureDbWriter();
+    if (!writer) {
+        return;
+    }
+    const contentMap = normalizeContentMap(documentContents);
+    for (const doc of documents) {
+        const content = contentMap.get(doc.sid);
+        writer.insertDocument(doc, content);
+    }
+    if (assets.length) {
+        writer.insertAssets(assets);
+    }
+    if (references.length) {
+        writer.insertReferences(references);
+    }
 }
 
 function createTables(db, schema) {
@@ -314,21 +346,21 @@ function buildParagraphRows(doc, paragraphs) {
     return {rows, sids};
 }
 
-function persistDocuments(db, rows, documentSchema) {
+function persistDocuments(db, rows, documentSchema, options) {
     if (!rows.length) {
         return;
     }
-    insertRows(db, 'documents', documentSchema.insertColumns, rows);
+    insertRows(db, 'documents', documentSchema.insertColumns, rows, options);
 }
 
-function persistSimpleRows(db, tableName, columns, rows) {
+function persistSimpleRows(db, tableName, columns, rows, options) {
     if (!rows.length) {
         return;
     }
-    insertRows(db, tableName, columns, rows);
+    insertRows(db, tableName, columns, rows, options);
 }
 
-function persistAssets(db, assets, assetsSchema) {
+function persistAssets(db, assets, assetsSchema, options) {
     if (!assets.length) {
         return;
     }
@@ -348,14 +380,14 @@ function persistAssets(db, assets, assetsSchema) {
         hash: asset.hash ?? null,
         language: asset.language ?? null
     }));
-    insertRows(db, 'assets', assetsSchema.insertColumns, rows);
+    insertRows(db, 'assets', assetsSchema.insertColumns, rows, options);
 }
 
-function persistReferences(db, references, referencesSchema) {
+function persistReferences(db, references, referencesSchema, options) {
     if (!references.length) {
         return;
     }
-    insertRows(db, 'references', referencesSchema.insertColumns, references);
+    insertRows(db, 'references', referencesSchema.insertColumns, references, options);
 }
 
 function serializeList(list) {
@@ -374,5 +406,6 @@ function normalizeScalar(value) {
 }
 
 export {
-    writeStructureDb
+    writeStructureDb,
+    createStructureDbWriter
 };

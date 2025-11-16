@@ -57,14 +57,15 @@ function runInTransaction(db, callback) {
     return tx();
 }
 
-function insertRows(db, tableName, columns, rows) {
+function insertRows(db, tableName, columns, rows, options = {}) {
     if (!rows.length) {
         return;
     }
+    const {transaction = true} = options;
     const columnSql = columns.map((col) => `"${col}"`).join(', ');
     const placeholderSql = columns.map((col) => `@${col}`).join(', ');
     const statement = db.prepare(`INSERT INTO "${tableName}" (${columnSql}) VALUES (${placeholderSql})`);
-    const execute = db.transaction((batch) => {
+    const runBatch = (batch) => {
         for (const row of batch) {
             const params = {};
             for (const column of columns) {
@@ -72,8 +73,13 @@ function insertRows(db, tableName, columns, rows) {
             }
             statement.run(params);
         }
-    });
-    execute(rows);
+    };
+    if (transaction) {
+        const execute = db.transaction(runBatch);
+        execute(rows);
+        return;
+    }
+    runBatch(rows);
 }
 
 export {

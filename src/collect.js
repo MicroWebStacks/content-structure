@@ -1,4 +1,4 @@
-import {glob} from 'glob'
+import {globStream} from 'glob'
 import { relative, resolve, join, sep, basename, dirname, parse, extname } from 'path';
 import path from 'path';
 import { get_next_uid, load_yaml, load_json, load_text,exists,exists_public } from './utils.js';
@@ -71,22 +71,22 @@ function shortMD5(text) {
 }
   
   
-async function get_all_files(ext_list){
+async function* get_all_files(ext_list){
     console.log(`content_dir : ${config.contentdir}`)
-    const originalDirectory = process.cwd();
-    process.chdir(config.contentdir)
     const filter = ext_list.map((ext)=>`*.${ext}`).join(",")
     console.log(`   searching for files with extensions : ${filter}`)
-    let glob_query = config.contentdir+`/**/{${filter}}`
-    if(ext_list.length == 1){
-        glob_query = config.contentdir+`/**/${filter}`
+    const globPattern = (ext_list.length === 1)
+        ? `**/${filter}`
+        : `**/{${filter}}`
+    const stream = globStream(globPattern,{
+        cwd: config.contentdir,
+        absolute: true,
+        nodir: true
+    })
+    for await (const filePath of stream){
+        const normalized = relative(config.contentdir,resolve(filePath)).split(sep).join('/')
+        yield normalized
     }
-    const results = await glob(glob_query)
-    //change to abs then rel to be cross os compatible
-    const files = results.map((file)=>(relative(config.contentdir,resolve(config.contentdir,file)).split(sep).join('/')))
-    debug(`change back to originalDirectory : ${originalDirectory}`)
-    process.chdir(originalDirectory)
-    return files
 }
 
 function entry_to_url(url_type,path,slug){
@@ -199,19 +199,14 @@ async function get_data(file_path){
     return entry
 }
 
-async function collect_documents_data(files_paths){
-    let content_entries = []
-    for(const file_path  of files_paths){
-        const extension = extname(file_path)
-        if(extension == ".md"){
-            const entry = await get_markdown_data(file_path)
-            content_entries.push(entry)
-        }else if((extension == ".yaml")||(extension == ".yml")||(extension == ".json")){
-            const entry = await get_data(file_path)
-            content_entries.push(entry)
-        }
+async function collect_document_data(file_path){
+    const extension = extname(file_path).toLowerCase()
+    if(extension == ".md"){
+        return await get_markdown_data(file_path)
+    }else if((extension == ".yaml")||(extension == ".yml")||(extension == ".json")){
+        return await get_data(file_path)
     }
-    return content_entries
+    return null
 }
 
 async function tree_content(markdown_text,entry_details){
@@ -319,7 +314,7 @@ function get_config(){
 
 export{
     parse_document,
-    collect_documents_data,
+    collect_document_data,
     get_all_files,
     check_add_assets,
     set_config,
