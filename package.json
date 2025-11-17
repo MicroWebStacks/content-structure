@@ -12,7 +12,7 @@
     "glob": "^10.3.10",
     "gray-matter": "^4.0.3",
     "js-yaml": "^4.1.0",
-    "jsdom": "^22.1.0",
+    "jsdom": "^27.2.0",
     "remark": "^15.0.1",
     "remark-directive": "^3.0.0",
     "remark-gfm": "^4.0.0",
