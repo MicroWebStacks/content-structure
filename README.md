@@ -125,7 +125,8 @@ the config parameter is optional and do have default values
 * `.structure/structure.db` : a SQLite database (powered by better-sqlite3) that mirrors the JSON output.  
   The database exposes the tables `documents`, `assets`, `items`, `item_assets`, and `references`.  
   Repeating values are normalised into dedicated tables, while any retained list uses a `*_list` column that stores a JSON string of the related ids.  
-  Items flatten the AST of every markdown document using a stable `version_id` per run, while `item_assets` keep strong links from inline placeholders back to the deduplicated blobs.
+  Items flatten the AST of every markdown document using a stable `version_id` per run, while `item_assets` keep strong links from inline placeholders back to the deduplicated blobs.  
+  Asset rows now declare a `type` (`file`, `table`, or `codeblock`), and only locally referenced files carry an `ext` entry.
 
 ## Example generated output
 

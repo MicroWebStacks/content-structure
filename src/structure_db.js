@@ -2,7 +2,7 @@ import { join } from 'path';
 import { check_dir_create, load_yaml_code } from './utils.js';
 import { get_config } from './collect.js';
 import { warn } from './libs/log.js';
-import { openDatabase, ensureTable, clearTable, insertRows, runInTransaction } from './sqlite_utils/index.js';
+import { openDatabase, ensureTable, clearTable, insertRows, runInTransaction, ensureColumn } from './sqlite_utils/index.js';
 import { computeVersionId } from './version_id.js';
 import { node_text } from './md_utils.js';
 
@@ -114,6 +114,7 @@ async function createStructureDbWriter(options = {}) {
     const referencesSchema = requireTableSchema(schema, 'references');
     runInTransaction(db, () => {
         createTables(db, schema);
+        syncTableColumns(db, schema);
         resetTables(db, schema);
     });
     const insertDocumentTx = db.transaction((payload) => {
@@ -186,6 +187,14 @@ function createTables(db, schema) {
     }
 }
 
+function syncTableColumns(db, schema) {
+    for (const table of schema.tables.values()) {
+        for (const column of table.columns) {
+            ensureColumn(db, table.name, column.name, column.sqliteType);
+        }
+    }
+}
+
 function resetTables(db, schema) {
     for (const table of schema.tables.values()) {
         clearTable(db, table.name);
@@ -215,17 +224,8 @@ function buildDocumentRow(doc, content, documentSchema, options = {}) {
     };
 }
 
-function getDocumentColumnValue(column, doc, content) {
-    switch (column.name) {
-        case 'headings_list':
-            return formatColumnValue(column, content?.headings ?? []);
-        case 'links_list':
-            return formatColumnValue(column, content?.links ?? []);
-        case 'references_list':
-            return formatColumnValue(column, content?.references ?? []);
-        default:
-            return formatColumnValue(column, doc[column.name]);
-    }
+function getDocumentColumnValue(column, doc) {
+    return formatColumnValue(column, doc[column.name]);
 }
 
 function formatColumnValue(column, value) {
@@ -318,7 +318,7 @@ function buildItemRows(doc, content, options = {}) {
     }
 
     function createAssetRef(assetUid, role, itemOrder, assetIndex = 0) {
-        if (!assetUid) {
+        if (!assetUid || !assetMap.has(assetUid)) {
             return null;
         }
         const refId = buildRefId(doc.sid, versionId, itemOrder, assetIndex);
@@ -572,6 +572,7 @@ function persistAssets(db, assets, assetsSchema, options) {
     }
     const rows = assets.map((asset) => ({
         uid: asset.uid,
+        type: asset.type ?? null,
         blob_hash: asset.blob_hash ?? null,
         parent_doc_uid: asset.parent_doc_uid ?? null,
         path: asset.path ?? null,

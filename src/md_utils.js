@@ -209,8 +209,7 @@ function get_tables_info(entry,content){
                 sid:table.sid,
                 document:entry.sid,
                 parent_doc_uid:entry.uid,
-                blob_content:serialized,
-                ext:"json"
+                blob_content:serialized
             })
         }
     }
@@ -238,6 +237,17 @@ function resolveDocumentAssetPath(entryPath,targetUrl){
         ? targetUrl
         : join(documentDir,targetUrl).replaceAll('\\','/')
     return decodeAssetPath(rawPath)
+}
+
+function isExternalAssetUrl(targetUrl){
+    if(!targetUrl){
+        return false
+    }
+    const trimmed = targetUrl.trim()
+    if(trimmed.startsWith('//')){
+        return true
+    }
+    return /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trimmed)
 }
 
 async function extract_images(tree, headings,entry) {
@@ -270,9 +280,12 @@ function get_images_info(entry,content){
     const images = []
     if(content.images.length > 0){
         for(const image of content.images){
+            if(isExternalAssetUrl(image.url)){
+                continue
+            }
             const path = resolveDocumentAssetPath(entry.path,image.url)
             images.push({
-                type:"image",
+                type:"file",
                 uid:image.uid,
                 sid:image.sid,
                 document:entry.sid,
@@ -313,13 +326,12 @@ function get_codes_info(entry,content){
     if(content.code.length > 0){
         for(const code of content.code){
             codes.push({
-                type:"code",
+                type:"codeblock",
                 uid:code.uid,
                 sid:code.sid,
                 document:entry.sid,
                 parent_doc_uid:entry.uid,
                 blob_content:code.text ?? '',
-                ext:code.language ?? 'txt',
                 language:code.language
             })
         }
@@ -356,35 +368,6 @@ function extract_links(tree,headings){
         })
     })
     return links_list
-}
-
-function get_links_assets_info(entry,content,assets_ext){
-    const links = []    
-    if(content.links.length > 0){
-        for(const link of content.links){
-            const external = link.url.startsWith('http')
-            const uid = `${entry.uid}#${link.id}`
-            const ext = file_ext(link.url)
-            let newlink = {
-                type:"link",
-                uid:uid,
-                sid:shortMD5(uid),
-                text:link.text,
-                document:entry.sid,
-                external:external,
-                ext: ext,
-                filter_ext: assets_ext.includes(ext)
-            }
-            if(external){
-                newlink.url = link.url
-            }else{
-                newlink.path = resolveDocumentAssetPath(entry.path,link.url)
-                //hash:shortMD5(code.text),
-            }
-            links.push(newlink)
-        }
-    }
-    return links
 }
 
 function extract_refs(tree,headings){
@@ -450,6 +433,5 @@ export{
     get_images_info,
     get_tables_info,
     get_codes_info,
-    get_links_assets_info,
     get_refs_info
 }

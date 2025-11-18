@@ -3,8 +3,7 @@ import { save_json,check_dir_create, exists, exists_public, file_ext } from './s
 import {get_images_info,get_codes_info,get_tables_info,
         get_refs_info} from './src/md_utils.js'
 import {parse_document,collect_document_data,
-        get_all_files, set_config,parse_markdown,
-        shortMD5} from './src/collect.js'
+        get_all_files, set_config,parse_markdown} from './src/collect.js'
 import { debug, warn } from './src/libs/log.js';
 import { createStructureDbWriter } from './src/structure_db.js';
 import { createBlobManager } from './src/blob_manager.js';
@@ -43,7 +42,6 @@ async function collect(config){
     const assetIndex = Object.create(null)
     const documentIndex = Object.create(null)
     const referenceSources = []
-    const referencedLocalAssets = new Set()
     const blobManager = createBlobManager(runTimestamp)
 
     await check_dir_create("ast")
@@ -68,7 +66,7 @@ async function collect(config){
                     ...get_tables_info(entry,content),
                     ...get_codes_info(entry,content)
                 ]
-                await annotateAssets(documentAssets,config,referencedLocalAssets)
+                await annotateAssets(documentAssets,config)
                 stampAssets(documentAssets, runTimestamp)
                 await attachBlobsToAssets(documentAssets, blobManager)
                 writer.insertDocument(entry,content,tree,documentAssets)
@@ -85,15 +83,6 @@ async function collect(config){
         process.chdir(originalCwd)
     }
 
-    const foundAssets = await collectUnreferencedAssets(config,referencedLocalAssets)
-    if(foundAssets.length > 0){
-        await annotateAssets(foundAssets,config,null)
-        stampAssets(foundAssets, runTimestamp)
-        await attachBlobsToAssets(foundAssets, blobManager)
-        writer.insertAssets(foundAssets)
-        addAssetsToIndex(assetIndex,foundAssets)
-    }
-
     const reference_list = buildReferenceList(referenceSources,assetIndex,documentIndex)
     if(reference_list.length > 0){
         writer.insertReferences(reference_list)
@@ -104,13 +93,10 @@ async function collect(config){
     }
 }
 
-async function annotateAssets(assets,config,referencedLocalAssets){
+async function annotateAssets(assets,config){
     for(const asset of assets){
         if(!Object.hasOwn(asset,"path")){
             continue
-        }
-        if(referencedLocalAssets){
-            referencedLocalAssets.add(asset.path)
         }
         let asset_exist = false
         let abs_path = ""
@@ -131,9 +117,6 @@ async function annotateAssets(assets,config,referencedLocalAssets){
             if(!asset.ext){
                 asset.ext = file_ext(asset.path)
             }
-        }else if(asset.filter_ext){
-            asset.exists = asset_exist
-            warn(`(X) asset from filter ext does not exist '${asset.path}'`)
         }
     }
 }
@@ -158,25 +141,6 @@ function buildReferenceSource(entry,content){
             references:image.references ?? []
         }))
     }
-}
-
-async function collectUnreferencedAssets(config,referencedLocalAssets){
-    const assets = []
-    for await (const filepath of get_all_files(config.assets_ext)){
-        if(referencedLocalAssets.has(filepath)){
-            continue
-        }
-        const uid = filepath.replaceAll("/",".")
-        assets.push({
-            type:"found",
-            uid:uid,
-            sid:shortMD5(uid),
-            path:filepath,
-            parent_doc_uid:null,
-            ext:file_ext(filepath)
-        })
-    }
-    return assets
 }
 
 function buildReferenceList(referenceSources,assetIndex,documentIndex){
