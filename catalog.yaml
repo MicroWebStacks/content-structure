@@ -18,10 +18,6 @@ datasets:
           - { name: headings_list, type: object_list, description: JSON list of heading metadata captured from the markdown }
           - { name: links_list, type: object_list, description: JSON list describing outbound links extracted from the document }
           - { name: references_list, type: object_list, description: JSON list of explicit reference declarations }
-          - { name: image_sid_list, type: string_list, description: Ordered list of referenced image SIDs }
-          - { name: table_sid_list, type: string_list, description: Ordered list of referenced table SIDs }
-          - { name: code_sid_list, type: string_list, description: Ordered list of referenced code block SIDs }
-          - { name: paragraph_sid_list, type: string_list, description: Ordered list of extracted paragraph SIDs }
       - name: assets
         description: Asset catalog linking documents to their concrete payloads via blob hashes derived from code blocks, tables, images, and loose files.
         columns:
@@ -42,51 +38,26 @@ datasets:
           - { name: year, type: int, description: UTC year extracted from the first_seen timestamp }
           - { name: month, type: int, description: UTC month extracted from the first_seen timestamp }
           - { name: prefix, type: string, description: First two hexadecimal characters of the blob hash used in the path layout }
-      - name: tables
-        description: Structured table blocks extracted from markdown content.
+      - name: items
+        description: Flattened AST items representing headings, paragraphs, and asset-backed nodes in reading order.
         columns:
-          - { name: sid, type: string, primary: true, description: Stable identifier for the table block }
-          - { name: uid, type: string, description: Human-readable id scoped to the document }
-          - { name: document_sid, type: string, description: SID of the parent document }
-          - { name: heading, type: string, description: Slug of the heading that contains the table }
-          - { name: text, type: string, description: Free-form text located near the table }
-          - { name: data_list, type: object_list, description: JSON list with the normalized table rows }
-          - { name: order_index, type: int, description: Position of the table within the document }
-      - name: images
-        description: Image directives extracted from markdown along with their derived metadata.
+          - { name: uid, type: string, primary: true, description: Unique item identifier scoped by document and version }
+          - { name: version_id, type: string, description: Encoded seconds-since-2000 identifier for the collection run }
+          - { name: doc_sid, type: string, description: SID of the parent document }
+          - { name: type, type: string, description: Item type such as heading, paragraph, table, code, or image }
+          - { name: level, type: int, description: Approximate nesting or heading depth derived from the AST }
+          - { name: order_index, type: int, description: Order of appearance within the document }
+          - { name: body_text, type: string, description: Textual body with inline asset references expressed as placeholders }
+          - { name: asset_uids, type: string_list, description: JSON list of asset UIDs associated with the item }
+      - name: item_assets
+        description: Strong references between items and stored assets/blobs for reconstructing embedded content.
         columns:
-          - { name: sid, type: string, primary: true, description: Stable identifier for the rendered image entry }
-          - { name: uid, type: string, description: Document-scoped identifier combining the document uid and image slug }
-          - { name: document_sid, type: string, description: Parent document SID }
-          - { name: slug, type: string, description: Slug derived from the image title, alt text, or file name }
-          - { name: source_sid, type: string, description: SID of the source asset when the image originated from the assets table }
-          - { name: heading, type: string, description: Heading slug where the image appears }
-          - { name: title, type: string, description: Title attribute captured from the markdown }
-          - { name: alt, type: string, description: Alternate text attached to the image }
-          - { name: url, type: string, description: External URL when the image references a remote resource }
-          - { name: text_list, type: string_list, description: Text nodes collected from SVG content or directives }
-          - { name: references_list, type: object_list, description: JSON list of references declared within the image context }
-          - { name: order_index, type: int, description: Position of the image within the document }
-      - name: code
-        description: Code blocks found in markdown files, including inline metadata and normalized identifiers.
-        columns:
-          - { name: sid, type: string, primary: true, description: Stable identifier for the code block }
-          - { name: uid, type: string, description: Document-scoped identifier for the code block }
-          - { name: document_sid, type: string, description: Parent document SID }
-          - { name: heading, type: string, description: Heading slug providing context for the code block }
-          - { name: language, type: string, description: Language fence value detected for the block }
-          - { name: text, type: string, description: Raw code as captured from the markdown }
-          - { name: hash, type: string, description: Content hash used to match duplicated blocks }
-          - { name: order_index, type: int, description: Position of the code block within the document }
-      - name: paragraphs
-        description: Paragraph level extracts kept for fine-grained linking and referencing.
-        columns:
-          - { name: sid, type: string, primary: true, description: Stable identifier for the paragraph }
-          - { name: uid, type: string, description: Generated identifier combining document uid with the paragraph order }
-          - { name: document_sid, type: string, description: Parent document SID }
-          - { name: heading, type: string, description: Heading slug that precedes the paragraph }
-          - { name: text, type: string, description: Paragraph text content }
-          - { name: order_index, type: int, description: Position of the paragraph within the document }
+          - { name: ref_id_in_body, type: string, primary: true, description: Placeholder identifier inserted into the related item body }
+          - { name: version_id, type: string, description: Encoded seconds-since-2000 identifier for the collection run }
+          - { name: doc_sid, type: string, description: SID of the document that owns the item }
+          - { name: asset_uid, type: string, description: UID of the referenced asset as stored in the assets table }
+          - { name: blob_hash, type: string, description: SHA-512 hash of the referenced blob }
+          - { name: role, type: string, description: Role of the asset within the item such as inline_image, table_data, or code_block }
       - name: references
         description: Directed edges describing explicit references between documents, images, and other assets.
         columns:

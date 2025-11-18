@@ -8,6 +8,7 @@ import {parse_document,collect_document_data,
 import { debug, warn } from './src/libs/log.js';
 import { createStructureDbWriter } from './src/structure_db.js';
 import { createBlobManager } from './src/blob_manager.js';
+import { computeVersionId } from './src/version_id.js';
 
 function decodePathValue(pathValue){
     if(!pathValue){
@@ -31,7 +32,10 @@ async function collect(config){
     config.matches.sid = 'sid::([\\w-.]+)'
 
     set_config(config)
-    const writer = await createStructureDbWriter()
+    const runDate = new Date()
+    const runTimestamp = runDate.toISOString()
+    const versionId = computeVersionId(runDate)
+    const writer = await createStructureDbWriter({versionId})
     if(!writer){
         return
     }
@@ -40,7 +44,6 @@ async function collect(config){
     const documentIndex = Object.create(null)
     const referenceSources = []
     const referencedLocalAssets = new Set()
-    const runTimestamp = new Date().toISOString()
     const blobManager = createBlobManager(runTimestamp)
 
     await check_dir_create("ast")
@@ -68,7 +71,7 @@ async function collect(config){
                 await annotateAssets(documentAssets,config,referencedLocalAssets)
                 stampAssets(documentAssets, runTimestamp)
                 await attachBlobsToAssets(documentAssets, blobManager)
-                writer.insertDocument(entry,content)
+                writer.insertDocument(entry,content,tree,documentAssets)
                 if(documentAssets.length > 0){
                     writer.insertAssets(documentAssets)
                     addAssetsToIndex(assetIndex,documentAssets)
