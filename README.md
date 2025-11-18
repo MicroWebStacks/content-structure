@@ -1,8 +1,12 @@
 # Content Structure
 content-structure collects all your markdown files meta data and parses the Abstract Syntax Tree of each file
 
-## deepwiki
+## Deepwiki
 https://deepwiki.com/MicroWebStacks/content-structure
+
+## Concept
+![design](design.drawio.svg)
+
 
 # Usage
 ```shell
