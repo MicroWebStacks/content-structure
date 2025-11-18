@@ -1,7 +1,6 @@
 import {join} from 'path'
 import { save_json,check_dir_create, exists, exists_public, file_ext } from './src/utils.js';
-import {get_images_info,get_codes_info,get_tables_info,
-        get_refs_info} from './src/md_utils.js'
+import {get_images_info,get_codes_info,get_tables_info} from './src/md_utils.js'
 import {parse_document,iterate_documents,
         set_config,parse_markdown} from './src/collect.js'
 import { debug, warn } from './src/libs/log.js';
@@ -41,7 +40,6 @@ async function collect(config){
 
     const assetIndex = Object.create(null)
     const documentIndex = Object.create(null)
-    const referenceSources = []
     const blobManager = createBlobManager(runTimestamp)
 
     await check_dir_create("ast")
@@ -77,16 +75,11 @@ async function collect(config){
                 writer.insertAssets(assetList)
                 addAssetsToIndex(assetIndex,assetList)
             }
-            referenceSources.push(buildReferenceSource(entry,content))
         }
     }finally{
         process.chdir(originalCwd)
     }
 
-    const reference_list = buildReferenceList(referenceSources,assetIndex,documentIndex)
-    if(reference_list.length > 0){
-        writer.insertReferences(reference_list)
-    }
     const blobRows = blobManager.getRows()
     if(blobRows.length > 0){
         writer.insertBlobs(blobRows)
@@ -128,28 +121,6 @@ function addAssetsToIndex(index,assets){
             uid:asset.uid
         }
     }
-}
-
-function buildReferenceSource(entry,content){
-    return {
-        sid:entry.sid,
-        uid:entry.uid,
-        references:content.references ?? [],
-        images:(content.images ?? []).map((image)=>({
-            sid:image.sid,
-            heading:image.heading,
-            references:image.references ?? []
-        }))
-    }
-}
-
-function buildReferenceList(referenceSources,assetIndex,documentIndex){
-    const allItemsMap = {...assetIndex,...documentIndex}
-    const references = []
-    for(const entry of referenceSources){
-        references.push(...get_refs_info(entry,allItemsMap))
-    }
-    return references
 }
 
 function stampAssets(assets,timestamp){

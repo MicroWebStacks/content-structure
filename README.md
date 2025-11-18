@@ -7,6 +7,11 @@ https://deepwiki.com/MicroWebStacks/content-structure
 ## Concept
 ![design](design.drawio.svg)
 
+# install
+prerequisites
+- choco
+- node-gyp
+see https://github.com/nodejs/node-gyp?tab=readme-ov-file#on-windows
 
 # Usage
 ```shell
@@ -105,7 +110,7 @@ the config parameter is optional and do have default values
     * `tree.json` the raw output of the remark AST parser
     * content.json with the parameters and parsed content parameters
 * `.structure/structure.db` : a SQLite database (powered by better-sqlite3) that mirrors the JSON output.  
-  The database exposes the tables `documents`, `assets`, `items`, `item_assets`, and `references`.  
+  The database exposes the tables `documents`, `assets`, `items`, and `item_assets`.  
   Repeating values are normalised into dedicated tables, while any retained list uses a `*_list` column that stores a JSON string of the related ids.  
   Items flatten the AST of every markdown document using a stable `version_id` per run, while `item_assets` keep strong links from inline placeholders back to the deduplicated blobs.  
   Asset rows now declare a `type` (`file`, `table`, `codeblock`, or `model`), and only locally referenced files carry an `ext` entry.

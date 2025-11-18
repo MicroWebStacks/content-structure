@@ -111,7 +111,6 @@ async function createStructureDbWriter(options = {}) {
     const blobsSchema = requireTableSchema(schema, 'blobs');
     const itemsSchema = requireTableSchema(schema, 'items');
     const itemAssetsSchema = requireTableSchema(schema, 'item_assets');
-    const referencesSchema = requireTableSchema(schema, 'references');
     runInTransaction(db, () => {
         createTables(db, schema);
         syncTableColumns(db, schema);
@@ -141,9 +140,6 @@ async function createStructureDbWriter(options = {}) {
         insertAssets(assetsList = []) {
             persistAssets(db, assetsList, assetsSchema);
         },
-        insertReferences(refList = []) {
-            persistReferences(db, refList, referencesSchema);
-        }
     };
 }
 
@@ -151,7 +147,6 @@ async function writeStructureDb({
     documents = [],
     assets = [],
     blobs = [],
-    references = [],
     documentContents,
     documentTrees,
     documentAssetsBySid,
@@ -175,9 +170,6 @@ async function writeStructureDb({
     }
     if (blobs.length) {
         writer.insertBlobs(blobs);
-    }
-    if (references.length) {
-        writer.insertReferences(references);
     }
 }
 
@@ -597,13 +589,6 @@ function persistBlobs(db, blobs, blobsSchema, options) {
         prefix: blob.prefix ?? null
     }));
     insertRows(db, 'blobs', blobsSchema.insertColumns, rows, options);
-}
-
-function persistReferences(db, references, referencesSchema, options) {
-    if (!references.length) {
-        return;
-    }
-    insertRows(db, 'references', referencesSchema.insertColumns, references, options);
 }
 
 function serializeList(list) {

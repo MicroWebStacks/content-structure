@@ -383,41 +383,6 @@ function extract_refs(tree,headings){
     return refs_list
 }
 
-function get_refs_info(entry,all_items_map){
-    const references = entry.references.map((ref)=>({
-        source_type:"document",
-        source_sid:entry.sid,
-        ...ref
-    }))
-    for(const image of entry.images){
-        const image_entries = image.references.map((ref)=>({
-            source_type:"image",
-            source_sid:image.sid,
-            heading:image.heading,
-            ...ref
-        }))
-        references.push(...image_entries)
-    }
-    const refs = []
-    for(const ref of references){
-        const target_sid = (ref.type=="page")?shortMD5(ref.value):ref.value
-        if(!Object.hasOwn(all_items_map,target_sid)){
-            warn(`(X) dropping reference '${ref.value}' that does not exist, referenced from '${ref.source_sid}'`)
-            continue
-        }
-        const target_Asset = all_items_map[target_sid]
-        refs.push({
-            source_type:ref.source_type,
-            source_sid:ref.source_sid,
-            source_heading:ref.heading,
-            target_type:target_Asset.type,
-            target_uid:target_Asset.uid,
-            target_sid:target_sid
-        })
-    }
-    return refs
-}
-
 export{
     md_tree,
     extract_headings,
@@ -433,6 +398,5 @@ export{
     extract_refs,
     get_images_info,
     get_tables_info,
-    get_codes_info,
-    get_refs_info
+    get_codes_info
 }
