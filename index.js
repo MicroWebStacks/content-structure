@@ -1,11 +1,11 @@
 import {join} from 'path'
-import { save_json,load_json,check_dir_create, exists, exists_public, file_ext } from './src/utils.js';
+import { save_json,check_dir_create, exists, exists_public, file_ext } from './src/utils.js';
 import {get_images_info,get_codes_info,get_tables_info,
         get_refs_info} from './src/md_utils.js'
 import {parse_document,collect_document_data,
         get_all_files, set_config,parse_markdown,
         shortMD5} from './src/collect.js'
-import { debug,green_log, warn } from './src/libs/log.js';
+import { debug, warn } from './src/libs/log.js';
 import { createStructureDbWriter } from './src/structure_db.js';
 import { createBlobManager } from './src/blob_manager.js';
 
@@ -44,39 +44,43 @@ async function collect(config){
     const blobManager = createBlobManager(runTimestamp)
 
     await check_dir_create("ast")
-    process.chdir(config.contentdir)
-    for await (const file_path of get_all_files(config.content_ext)){
-        const entry = await collect_document_data(file_path)
-        if(entry == null){
-            continue
-        }
-        documentIndex[entry.sid] = {
-            type:"document",
-            uid:entry.uid
-        }
-        if(entry.format.startsWith("markdown")){
-            debug(` parsing sid: ${entry.sid} path: ${entry.path}`)
-            const {tree,content} = await parse_document(entry)
-            await save_json(tree,join("ast",`${entry.sid}.json`))
-            const documentAssets = [
-                ...get_images_info(entry,content),
-                ...get_tables_info(entry,content),
-                ...get_codes_info(entry,content)
-            ]
-            await annotateAssets(documentAssets,config,referencedLocalAssets)
-            stampAssets(documentAssets, runTimestamp)
-            await attachBlobsToAssets(documentAssets, blobManager)
-            writer.insertDocument(entry,content)
-            if(documentAssets.length > 0){
-                writer.insertAssets(documentAssets)
-                addAssetsToIndex(assetIndex,documentAssets)
+    const originalCwd = process.cwd()
+    try{
+        process.chdir(config.contentdir)
+        for await (const file_path of get_all_files(config.content_ext)){
+            const entry = await collect_document_data(file_path)
+            if(entry == null){
+                continue
             }
-            referenceSources.push(buildReferenceSource(entry,content))
-        }else{
-            writer.insertDocument(entry)
+            documentIndex[entry.sid] = {
+                type:"document",
+                uid:entry.uid
+            }
+            if(entry.format.startsWith("markdown")){
+                debug(` parsing sid: ${entry.sid} path: ${entry.path}`)
+                const {tree,content} = await parse_document(entry)
+                await save_json(tree,join("ast",`${entry.sid}.json`))
+                const documentAssets = [
+                    ...get_images_info(entry,content),
+                    ...get_tables_info(entry,content),
+                    ...get_codes_info(entry,content)
+                ]
+                await annotateAssets(documentAssets,config,referencedLocalAssets)
+                stampAssets(documentAssets, runTimestamp)
+                await attachBlobsToAssets(documentAssets, blobManager)
+                writer.insertDocument(entry,content)
+                if(documentAssets.length > 0){
+                    writer.insertAssets(documentAssets)
+                    addAssetsToIndex(assetIndex,documentAssets)
+                }
+                referenceSources.push(buildReferenceSource(entry,content))
+            }else{
+                writer.insertDocument(entry)
+            }
         }
+    }finally{
+        process.chdir(originalCwd)
     }
-    process.chdir(process.cwd())
 
     const foundAssets = await collectUnreferencedAssets(config,referencedLocalAssets)
     if(foundAssets.length > 0){

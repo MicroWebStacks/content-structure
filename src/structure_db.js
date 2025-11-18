@@ -186,24 +186,6 @@ function normalizeContentMap(documentContents) {
     return new Map(Object.entries(documentContents));
 }
 
-function buildDocumentPayloads(documents, contentMap, documentSchema) {
-    const docRows = [];
-    const tableRows = [];
-    const imageRows = [];
-    const codeRows = [];
-    const paragraphRows = [];
-    for (const doc of documents) {
-        const content = contentMap.get(doc.sid);
-        const {row, tables, images, code, paragraphs} = buildDocumentRow(doc, content, documentSchema);
-        docRows.push(row);
-        tableRows.push(...tables);
-        imageRows.push(...images);
-        codeRows.push(...code);
-        paragraphRows.push(...paragraphs);
-    }
-    return {docRows, tableRows, imageRows, codeRows, paragraphRows};
-}
-
 function buildDocumentRow(doc, content, documentSchema) {
     const tablesResult = buildTableRows(doc, content?.tables ?? []);
     const imagesResult = buildImageRows(doc, content?.images ?? []);
@@ -411,12 +393,22 @@ function serializeList(list) {
     return JSON.stringify(value);
 }
 
+/**
+ * Normalize scalar values for storage, accepting booleans, numbers, strings, null, or undefined.
+ * @param {boolean | number | string | null | undefined} value
+ * @returns {number | string | null}
+ */
 function normalizeScalar(value) {
     if (value === null || value === undefined) {
         return null;
     }
     if (typeof value === 'boolean') {
         return value ? 1 : 0;
+    }
+    if (typeof value === 'string') {
+        const lower = value.trim().toLowerCase();
+        if (lower === 'true' || lower === '1') return 1;
+        if (lower === 'false' || lower === '0') return 0;
     }
     return value;
 }
