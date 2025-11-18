@@ -11,10 +11,9 @@ datasets:
           - { name: url, type: string, description: Public route exposed for the document }
           - { name: url_type, type: string, description: Indicates whether the URL maps to a directory or a file }
           - { name: slug, type: string, description: Slug used for building anchors and nested references }
-          - { name: format, type: string, description: Content format such as markdown, markdown_card, or data }
-          - { name: title, type: string, description: Document title resolved from front matter or headings }
-          - { name: content_type, type: string, description: High-level classification like generic, cards, or authors }
+          - { name: title, type: string, description: Document title resolved from folder names or front matter }
           - { name: level, type: int, description: Depth of the document in the navigation tree }
+          - { name: model, type: string, description: UID of the model asset linked to the document (front matter or YAML model file) }
       - name: items
         description: Flattened AST items representing headings, paragraphs, and asset-backed nodes in reading order.
         columns:
@@ -36,10 +35,10 @@ datasets:
           - { name: blob_hash, type: string, description: SHA-512 hash of the referenced blob }
           - { name: role, type: string, description: Role of the asset within the item such as inline_image, table_data, or code_block }
       - name: assets
-        description: Asset catalog linking documents to their concrete payloads via blob hashes derived from code blocks, tables, images, and loose files.
+        description: Asset catalog linking documents to their concrete payloads via blob hashes derived from code blocks, tables, image references, models, and loose files.
         columns:
           - { name: uid, type: string, primary: true, description: Stable identifier composed from the document uid and asset slug }
-          - { name: type, type: string, description: Asset type such as codeblock, table, or file }
+          - { name: type, type: string, description: Asset type such as codeblock, table, file, or model }
           - { name: blob_hash, type: string, description: SHA-512 hash pointing to the corresponding row in the blobs table }
           - { name: parent_doc_uid, type: string, description: UID of the document that introduced the asset }
           - { name: path, type: string, description: Source-relative path for file-backed assets }

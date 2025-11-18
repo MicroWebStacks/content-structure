@@ -27,23 +27,17 @@ import {getDocuments, getEntry} from 'content-structure'
 const documents = await getDocuments()
 console.log(`obtained ${documents.length} documents`)
 
-const authors = await getDocuments({content_type:"authors"})
-console.log(`found ${authors.length} authors`)
-
-const generic_markdown = await getDocuments({format:"markdown",content_type:"generic"})
-console.log(`found ${generic_markdown.length} generic markdown entries`)
-
 const image_entry = await getEntry({slug:"image"})
 const images_urls = image_entry.data.images.map(image=>image.url)
 console.log(`'image' content entry has following images '${images_urls}'`)
+console.log(`image model asset uid is '${image_entry.model}'`)
 
 ```
 will output
 ```shell
 obtained 14 documents
-found 3 authors
-found 11 generic markdown entries
 'image' content entry has following images './tree.svg,./long-diagram.svg'
+image model asset uid is 'image#frontmatter'
 ```
 
 # Roadmap
@@ -63,34 +57,22 @@ found 11 generic markdown entries
 
 # Documentation
 ## Documents fields description
-### Content type
-Content type is a field existing in every document as `content_type`. For a hierarchically structured content, the content type can be derived from the parent folder, and can in all cases be overridden by the user when defined in the meta data (markdown frontmatter or content of json or yaml)
+### Models
+Documents expose a `model` column that points to an asset UID.  
+In multi-document mode (default) a document model is generated from the markdown front matter and stored as a `model` asset (`<document uid>#frontmatter`).  
+When `folder_single_doc` is enabled in the configuration, every folder is treated as a single document:
 
- 1. `content_type` field in data  => taken from data
- 2. content depth > 1             => type derived from the parent folder
- 3. root content                  => generic
+1. All markdown files inside the folder are concatenated alphabetically and parsed as one document. Front matter is ignored.
+2. The first YAML/YML/JSON file inside the same folder becomes the document model asset (`<document uid>#filename.ext`).
 
-The "generic" content type is the default assignment when no parent and no manual type is provided, the genric type does not get included in the uid definition
-
-The content type, like any other field, can be filtered as follows
-```javascript
-const authors = await getDocuments({content_type:"authors"})
-```
-see also the following section for an `author` content_type example.
+Model assets are stored in the `assets` table like any other blob/file. Their UID can be used to fetch the actual payload via the blobs table.
+When using `folder_single_doc`, ensure that `content_ext` contains the extensions of the model files you expect to pick up (for example `["md","yml","yaml","json"]`).
 
 ### URL type
-Content structure allows both file and folder URL types to be used at the same time without the need of user configuration. The convention is the basename of the file, in case it is `readme` for markdown or `entry`,`document` for json or yaml, the URL will be considered as folder, and file for any other filename.
+Content structure allows both file and folder URL types to be used at the same time without the need of user configuration.  
+If a markdown file is named `readme.md` or matches the parent directory name, it is treated as a folder document (`url_type: "dir"`); any other filename is considered a file document.
 
-All of the three files below will automatically generate a filed `content_type` of the parent folder `authors` if not otherwise specified inside the json or yaml files.
-```shell
- ───content
-    ├───authors
-    │   │   myself.json
-    │   │   stephen-king.yaml
-    │   └───agatha-christie
-    │           entry.yml    ...
-```
-the field `url_type` will also be exposed for the user as in the example entry below
+The field `url_type` will also be exposed for the user as in the example entry below
 ```json
   {
     "sid": "a518c9b7",
@@ -98,8 +80,7 @@ the field `url_type` will also be exposed for the user as in the example entry b
     "path": "authors/agatha-christie/entry.yml",
     "url_type": "dir",
     "slug": "agatha-christie",
-    "format": "data",
-    "content_type": "authors",
+    "model": "authors.agatha-christie#frontmatter"
     ...
   }
 ```
@@ -108,6 +89,7 @@ the field `url_type` will also be exposed for the user as in the example entry b
 the config parameter is optional and do have default values
 * `rootdir` : defaults to current working directory. The path where to find the a `content` directory.
 * `outdir` : defaults to `.structure`. Relative output directory is the location where all output data will be generated, which is relative to the root directory.
+* `folder_single_doc` : defaults to `false`. When `true`, each folder is treated as a single document and the first YAML/YML/JSON file becomes the document model asset.
 
 ## Generated output
 * `gen/document_list.json`
@@ -126,7 +108,7 @@ the config parameter is optional and do have default values
   The database exposes the tables `documents`, `assets`, `items`, `item_assets`, and `references`.  
   Repeating values are normalised into dedicated tables, while any retained list uses a `*_list` column that stores a JSON string of the related ids.  
   Items flatten the AST of every markdown document using a stable `version_id` per run, while `item_assets` keep strong links from inline placeholders back to the deduplicated blobs.  
-  Asset rows now declare a `type` (`file`, `table`, or `codeblock`), and only locally referenced files carry an `ext` entry.
+  Asset rows now declare a `type` (`file`, `table`, `codeblock`, or `model`), and only locally referenced files carry an `ext` entry.
 
 ## Example generated output
 
@@ -161,9 +143,8 @@ generates this output
     "path": "title-complex/readme.md",
     "url_type": "dir",
     "slug": "title-complex",
-    "format": "markdown",
     "title": "title Complex",
-    "content_type": "generic"
+    "model": "title-complex#frontmatter"
   },
   {
     "sid": "12b0e722",
@@ -171,9 +152,8 @@ generates this output
     "path": "text-simple/readme.md",
     "url_type": "dir",
     "slug": "text-simple",
-    "format": "markdown",
     "title": "Text Simple",
-    "content_type": "generic"
+    "model": null
   },
   ...
 ```
@@ -193,9 +173,8 @@ example of generated files for `image/readme.md` which has an sid of `78805a22`
   "path": "image/readme.md",
   "url_type": "dir",
   "slug": "image",
-  "format": "markdown",
   "title": "Image",
-  "content_type": "generic",
+  "model": "image#frontmatter",
   "headings": [],
   "tables": [],
   "images": [

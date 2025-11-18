@@ -228,11 +228,12 @@ function decodeAssetPath(pathValue){
     }
 }
 
-function resolveDocumentAssetPath(entryPath,targetUrl){
+function resolveDocumentAssetPath(entry,targetUrl){
     if(!targetUrl){
         return targetUrl
     }
-    const documentDir = dirname(entryPath)
+    const baseDir = entry?.base_dir
+    const documentDir = (baseDir && baseDir !== '') ? baseDir : dirname(entry?.path ?? '')
     const rawPath = targetUrl.startsWith("/")
         ? targetUrl
         : join(documentDir,targetUrl).replaceAll('\\','/')
@@ -283,7 +284,7 @@ function get_images_info(entry,content){
             if(isExternalAssetUrl(image.url)){
                 continue
             }
-            const path = resolveDocumentAssetPath(entry.path,image.url)
+            const path = resolveDocumentAssetPath(entry,image.url)
             images.push({
                 type:"file",
                 uid:image.uid,

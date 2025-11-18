@@ -1,7 +1,6 @@
 import {globStream} from 'glob'
 import { relative, resolve, join, sep, basename, dirname, parse, extname } from 'path';
-import path from 'path';
-import { get_next_uid, load_yaml, load_json, load_text,exists,exists_public } from './utils.js';
+import { load_text,exists,exists_public } from './utils.js';
 import { md_tree, title_slug, extract_headings,
         extract_tables,extract_images,extract_code,
         extract_paragraphs, extract_links,extract_refs } from './md_utils.js';
@@ -14,30 +13,9 @@ let config = {
     rootdir: process.cwd(),
     contentdir: "content",
     outdir: ".structure",
-    debug:false
-}
-
-/**
- * type in data         => priority for type from data
- * depth > 1            => auto-type from parent folder
- * root content         => generic
- */
-function get_type(data,file_path,url_type){
-    if(Object.hasOwn("type")){
-        return data.type
-    }else{
-        let depth = file_path.split('/').length
-        let parent_path = dirname(file_path)
-        if(url_type == "dir"){
-            depth -= 1
-            parent_path = dirname(parent_path)
-        }
-        if(depth > 1){
-            return basename(parent_path)
-        }else{
-            return "generic"
-        }
-    }
+    debug:false,
+    folder_single_doc:false,
+    content_ext:['md']
 }
 
 function get_slug(data,path,url_type){
@@ -52,17 +30,30 @@ function get_slug(data,path,url_type){
     }
 }
 
-let content_urls = new Map()
-
-function get_uid(slug,type){
-    let uid = (type === "generic") ? slug : `${type}.${slug}`
-    if(!content_urls.has(type)){
-        content_urls.set(type,[uid])    //create new list
-    }else{
-        uid = get_next_uid(uid,content_urls.get(type))
-        content_urls.get(type).push(uid)
+function buildDocumentUid(urlPath, slug, fallbackPath){
+    const normalizedUrl = normalizeUrlToUid(urlPath);
+    if(normalizedUrl){
+        return normalizedUrl;
     }
-    return uid
+    if(slug){
+        return slug.replaceAll('/', '.');
+    }
+    const sanitizedPath = (fallbackPath ?? '').replace(/\.[^.]+$/, '').split('/').filter(Boolean).join('.');
+    if(sanitizedPath){
+        return sanitizedPath;
+    }
+    return shortMD5(fallbackPath ?? '');
+}
+
+function normalizeUrlToUid(urlPath){
+    if(!urlPath){
+        return null;
+    }
+    const segments = urlPath.split('/').filter(Boolean);
+    if(segments.length === 0){
+        return null;
+    }
+    return segments.join('.');
 }
 
 function shortMD5(text) {
@@ -138,75 +129,177 @@ function get_url_type(file_path){
     }
 }
 
-async function get_markdown_data(file_path){
+async function createMarkdownDocumentSource(file_path){
     const url_type = get_url_type(file_path)
-    const text = await load_text(file_path)
-    const {content, data} = matter(text)
-
+    const markdownText = await load_text(file_path)
+    const {data, content} = matter(markdownText)
     const slug = get_slug(data,file_path,url_type)
-    const content_type = get_type(data,file_path,url_type)
-    const uid = get_uid(slug,content_type)
-    const sid = shortMD5(uid)
-    const title = Object.hasOwn(data,"title")?data.title:slug
-    if(Object.hasOwn(data,"title")){
-        delete data.title
-    }
     const url = entry_to_url(url_type,file_path,slug)
+    const uid = buildDocumentUid(url, slug, file_path)
+    const sid = shortMD5(uid)
     const level = entry_to_level(url_type,file_path)
-    let entry       = {
-        sid:            sid,         //short unique id
-        uid:            uid,        //unique, fallback appending -1, -2,...
-        path:           file_path,
-        url:            url,
-        url_type:       url_type,
-        slug:           slug,       //not unique
-        format:         "markdown",
-        title:          title,
-        content_type:   content_type,
-        level:          level,
-        ...data,
+    const base_dir = getDocumentBaseDir(file_path)
+    const modelData = {...data}
+    const title = Object.hasOwn(modelData,"title") ? modelData.title : slug
+    if(Object.hasOwn(modelData,"title")){
+        delete modelData.title
     }
-    return entry
+    const entry = {
+        sid,
+        uid,
+        path:file_path,
+        url,
+        url_type,
+        slug,
+        title,
+        level,
+        base_dir,
+        model:null,
+        ...modelData
+    }
+    const modelAsset = createFrontmatterAsset(entry, data)
+    if(modelAsset){
+        entry.model = modelAsset.uid
+    }
+    return {
+        entry,
+        markdownText:markdownText,
+        modelAsset
+    }
 }
 
-async function get_data(file_path){
-    const parsedPath = path.parse(file_path);
-    const file_base_name = parsedPath.name
-    const url_type = (["entry","document"].includes(file_base_name)?"dir":"file")
-    const extension = parsedPath.ext
-    let data = {}
-    if(extension == ".json"){
-        data = await load_json(file_path)
+async function* collectMarkdownFileDocuments(){
+    for await (const file_path of get_all_files(config.content_ext)){
+        if(extname(file_path).toLowerCase() !== '.md'){
+            continue
+        }
+        const source = await createMarkdownDocumentSource(file_path)
+        if(source){
+            yield source
+        }
+    }
+}
+
+const MODEL_FILE_EXTENSIONS = new Set(['.yaml','.yml','.json'])
+
+async function* collectSingleFolderDocuments(){
+    const buckets = new Map()
+    for await (const file_path of get_all_files(config.content_ext)){
+        const extension = extname(file_path).toLowerCase()
+        if(extension !== '.md' && !MODEL_FILE_EXTENSIONS.has(extension)){
+            continue
+        }
+        const dir = dirname(file_path) || '.'
+        if(!buckets.has(dir)){
+            buckets.set(dir,{markdown:[],models:[]})
+        }
+        const bucket = buckets.get(dir)
+        if(extension === '.md'){
+            bucket.markdown.push(file_path)
+        }else{
+            bucket.models.push(file_path)
+        }
+    }
+    const sortedDirs = Array.from(buckets.keys()).sort()
+    for(const dir of sortedDirs){
+        const bucket = buckets.get(dir)
+        if(!bucket || bucket.markdown.length === 0){
+            continue
+        }
+        bucket.markdown.sort()
+        const sections = []
+        for(const file_path of bucket.markdown){
+            const raw = await load_text(file_path)
+            const {content} = matter(raw)
+            if(content && content.trim().length > 0){
+                sections.push(content.trim())
+            }
+        }
+        const markdownText = sections.join('\n\n')
+        const primaryPath = bucket.markdown[0]
+        const url_type = 'dir'
+        const slug = get_slug({},primaryPath,url_type)
+        const url = entry_to_url(url_type,primaryPath,slug)
+        const uid = buildDocumentUid(url, slug, primaryPath)
+        const sid = shortMD5(uid)
+        const level = entry_to_level(url_type,primaryPath)
+        const title = slug
+        const base_dir = dir === '' ? '.' : dir
+        const entry = {
+            sid,
+            uid,
+            path:primaryPath,
+            url,
+            url_type,
+            slug,
+            title,
+            level,
+            base_dir,
+            model:null
+        }
+        const modelAsset = createFolderModelAsset(entry,bucket.models)
+        if(modelAsset){
+            entry.model = modelAsset.uid
+        }
+        yield {
+            entry,
+            markdownText,
+            modelAsset
+        }
+    }
+}
+
+function getDocumentBaseDir(file_path){
+    const dir = dirname(file_path)
+    if(dir === ''){
+        return '.'
+    }
+    return dir
+}
+
+function createFrontmatterAsset(entry, frontmatter){
+    if(!frontmatter){
+        return null
+    }
+    const keys = Object.keys(frontmatter)
+    if(keys.length === 0){
+        return null
+    }
+    const uid = `${entry.uid}#frontmatter`
+    const asset = {
+        type:"model",
+        uid,
+        sid:shortMD5(uid),
+        document:entry.sid,
+        parent_doc_uid:entry.uid,
+        blob_content:JSON.stringify(frontmatter)
+    }
+    return asset
+}
+
+function createFolderModelAsset(entry, modelFiles = []){
+    if(!modelFiles || modelFiles.length === 0){
+        return null
+    }
+    const sorted = [...modelFiles].sort()
+    const selected = sorted[0]
+    const uid = `${entry.uid}#${basename(selected)}`
+    return {
+        type:"model",
+        uid,
+        sid:shortMD5(uid),
+        document:entry.sid,
+        parent_doc_uid:entry.uid,
+        path:selected
+    }
+}
+
+async function* iterate_documents(){
+    if(config.folder_single_doc){
+        yield* collectSingleFolderDocuments()
     }else{
-        data = await load_yaml(file_path)
+        yield* collectMarkdownFileDocuments()
     }
-    const slug = get_slug(data,file_path,url_type)
-    const content_type = get_type(data,file_path,url_type)
-    const uid = get_uid(slug,content_type)
-    const sid = shortMD5(uid)
-    const url = entry_to_url(url_type,file_path,slug)
-    let entry       = {
-        sid:            sid,         //short unique id
-        uid:            uid,        //unique, fallback appending -1, -2,...
-        path:           file_path,
-        url:            url,
-        url_type:       url_type,
-        slug:           slug,       //not unique
-        format:         "data",
-        content_type:   content_type,
-        ...data,
-    }
-    return entry
-}
-
-async function collect_document_data(file_path){
-    const extension = extname(file_path).toLowerCase()
-    if(extension == ".md"){
-        return await get_markdown_data(file_path)
-    }else if((extension == ".yaml")||(extension == ".yml")||(extension == ".json")){
-        return await get_data(file_path)
-    }
-    return null
 }
 
 async function tree_content(markdown_text,entry_details){
@@ -244,9 +337,9 @@ async function parse_markdown(markdown,path){
     return tree_content(markdown,entry_details)
 }
 
-async function parse_document(entry){
+async function parse_document(entry, options = {}){
     const entry_details = JSON.parse(JSON.stringify(entry))
-    const markdown_text = await load_text(entry.path)
+    const markdown_text = options.markdownText ?? await load_text(entry.path)
     return tree_content(markdown_text,entry_details)
 }
 
@@ -297,7 +390,16 @@ async function check_add_assets(asset_list,content_assets){
 
 function set_config(new_config){
     if(new_config != null){
-        config = new_config
+        config = {
+            ...config,
+            ...new_config
+        }
+        if(config.folder_single_doc === undefined){
+            config.folder_single_doc = false
+        }
+        if(!Array.isArray(config.content_ext) || config.content_ext.length === 0){
+            config.content_ext = ['md']
+        }
         if(config.debug){
             console.log("config:")
             console.log(config)
@@ -314,11 +416,10 @@ function get_config(){
 
 export{
     parse_document,
-    collect_document_data,
-    get_all_files,
     check_add_assets,
     set_config,
     get_config,
     parse_markdown,
-    shortMD5
+    shortMD5,
+    iterate_documents
 }
