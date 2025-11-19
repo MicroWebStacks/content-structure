@@ -8,7 +8,7 @@
     "demo": "pnpm --filter content-structure-example demo"
   },
   "dependencies": {
-    "better-sqlite3": "^9.4.5",
+    "better-sqlite3": "^12.4.1",
     "glob": "^10.3.10",
     "gray-matter": "^4.0.3",
     "js-yaml": "^4.1.0",
