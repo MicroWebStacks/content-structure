@@ -19,6 +19,8 @@ datasets:
           - { name: image, type: string, description: UID of the primary image asset associated with the document (front matter or YAML image file) }
           - { name: tags, type: string_list, description: JSON list of tag UIDs associated with the document (front matter or YAML tags file) }
           - { name: features, type: string_list, description: JSON list of feature associated with the document (front matter or YAML features file) }
+          - { name: cards, type: string_list, description: JSON list of card UIDs associated with the document (front matter or YAML cards file) }
+          - { name: format, type: string, values: [markdown, markdown_card], description: Format of the source document such as standard markdown or markdown_card }
           - { name: model, type: string, description: UID of the model asset linked to the document (front matter or YAML model file) }
       - name: items
         description: Flattened AST items representing headings, paragraphs, and asset-backed nodes in reading order.

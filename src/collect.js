@@ -2,11 +2,12 @@ import {globStream} from 'glob'
 import { relative, resolve, join, sep, basename, dirname, parse, extname } from 'path';
 import { load_text,exists,exists_public } from './utils.js';
 import { md_tree, title_slug, extract_headings,
-        extract_tables,extract_images,extract_code,
-        extract_paragraphs, extract_links,extract_refs } from './md_utils.js';
+    extract_tables,extract_images,extract_code,
+    extract_paragraphs, extract_links,extract_refs } from './md_utils.js';
 import matter from 'gray-matter';
 import { createHash } from 'crypto';
-import {warn, debug} from './libs/log.js'
+import {warn} from './libs/log.js'
+import { getStructureSchema } from './structure_db.js'
 
 let config = {
     rootdir: process.cwd(),
@@ -16,9 +17,9 @@ let config = {
     folder_single_doc:false
 }
 
-const KNOWN_ENTRY_FIELDS = new Set([
-    'title','slug','order','description','date','lastmod','image','tags','features'
-])
+const DOCUMENTS_TABLE_NAME = 'documents'
+
+let knownEntryFieldsPromise = null
 
 
 function get_slug(data,path,url_type){
@@ -62,6 +63,20 @@ function normalizeUrlToUid(urlPath){
 function shortMD5(text) {
     const hash = createHash('md5').update(text, 'utf8').digest('hex');
     return hash.substring(0, 8);
+}
+
+async function getKnownEntryFieldSet(){
+    if(!knownEntryFieldsPromise){
+        knownEntryFieldsPromise = loadKnownEntryFieldSet()
+    }
+    return knownEntryFieldsPromise
+}
+
+async function loadKnownEntryFieldSet(){
+    const schema = await getStructureSchema()
+    const documentsTable = schema?.tables?.get(DOCUMENTS_TABLE_NAME)
+    const columnNames = (documentsTable?.columns ?? []).map(column => column.name).filter(Boolean)
+    return new Set(columnNames)
 }
   
   
@@ -136,7 +151,8 @@ async function createMarkdownDocumentSource(file_path){
     const url_type = get_url_type(file_path)
     const markdownText = await load_text(file_path)
     const {data} = matter(markdownText)
-    const {entryFields, modelFields} = partitionFrontmatter(data ?? {})
+    const knownEntryFields = await getKnownEntryFieldSet()
+    const {entryFields, modelFields} = partitionFrontmatter(data ?? {}, knownEntryFields)
 
     const slug = get_slug(entryFields,file_path,url_type)
     const url = entry_to_url(url_type,file_path,slug)
@@ -156,7 +172,7 @@ async function createMarkdownDocumentSource(file_path){
         level,
         base_dir
     }
-    applyEntryOverrides(entry, entryFields)
+    applyEntryOverrides(entry, entryFields, knownEntryFields)
     const modelAsset = createFrontmatterAsset(entry, modelFields)
     if(modelAsset){
         entry.model = modelAsset.uid
@@ -363,11 +379,11 @@ async function check_add_assets(asset_list,content_assets){
     }
 }
 
-function partitionFrontmatter(frontmatter = {}){
+function partitionFrontmatter(frontmatter = {}, knownEntryFields){
     const entryFields = {}
     const modelFields = {}
     for(const [key,value] of Object.entries(frontmatter)){
-        if(KNOWN_ENTRY_FIELDS.has(key)){
+        if(knownEntryFields.has(key)){
             entryFields[key] = value
         }else{
             modelFields[key] = value
@@ -376,12 +392,12 @@ function partitionFrontmatter(frontmatter = {}){
     return {entryFields, modelFields}
 }
 
-function applyEntryOverrides(entry, entryFields){
-    for(const key of KNOWN_ENTRY_FIELDS){
-        if((key === 'title' || key === 'slug') || !Object.hasOwn(entryFields,key)){
+function applyEntryOverrides(entry, entryFields, knownEntryFields){
+    for(const [key,value] of Object.entries(entryFields)){
+        if(!knownEntryFields.has(key) || key === 'title' || key === 'slug'){
             continue
         }
-        entry[key] = entryFields[key]
+        entry[key] = value
     }
 }
 

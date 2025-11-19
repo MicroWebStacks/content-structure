@@ -618,5 +618,6 @@ function normalizeScalar(value) {
 
 export {
     writeStructureDb,
-    createStructureDbWriter
+    createStructureDbWriter,
+    getStructureSchema
 };
