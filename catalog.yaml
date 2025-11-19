@@ -45,10 +45,16 @@ datasets:
           - { name: uid, type: string, primary: true, description: Stable identifier composed from the document uid and asset slug }
           - { name: type, type: string, values: [file, codeblock, table, model], description: Asset type such as codeblock, table, file, or model }
           - { name: blob_hash, type: string, description: SHA-512 hash identifying the stored blob payload }
-          - { name: blob_size, type: int, description: Size of the stored blob in bytes }
-          - { name: blob_path, type: string, description: Relative path including the blobs/year/month/prefix layout }
           - { name: parent_doc_uid, type: string, description: UID of the document that introduced the asset }
           - { name: path, type: string, description: Source-relative path for file-backed assets }
           - { name: ext, type: string, description: File extension for referenced files when available }
           - { name: first_seen, type: string, description: ISO timestamp when the asset was first observed }
           - { name: last_seen, type: string, description: ISO timestamp when the asset was most recently observed }
+      - name: blobs
+        description: Unique blob payloads materialized on disk and shared across assets via their SHA-512 hash.
+        columns:
+          - { name: hash, type: string, primary: true, description: SHA-512 hash identifying the blob }
+          - { name: size, type: int, description: Size of the stored blob in bytes }
+          - { name: path, type: string, description: Relative path including the blobs/year/month/prefix layout }
+          - { name: first_seen, type: string, description: ISO timestamp when the blob was first observed }
+          - { name: last_seen, type: string, description: ISO timestamp when the blob was most recently observed }

@@ -108,6 +108,7 @@ async function createStructureDbWriter(options = {}) {
     }
     const documentsSchema = requireTableSchema(schema, 'documents');
     const assetsSchema = requireTableSchema(schema, 'assets');
+    const blobsSchema = requireTableSchema(schema, 'blobs');
     const itemsSchema = requireTableSchema(schema, 'items');
     const assetVersionSchema = requireTableSchema(schema, 'asset_version');
     runInTransaction(db, () => {
@@ -136,12 +137,16 @@ async function createStructureDbWriter(options = {}) {
         insertAssets(assetsList = []) {
             persistAssets(db, assetsList, assetsSchema);
         },
+        insertBlobs(blobsList = []) {
+            persistBlobs(db, blobsList, blobsSchema);
+        }
     };
 }
 
 async function writeStructureDb({
     documents = [],
     assets = [],
+    blobs = [],
     documentContents,
     documentTrees,
     documentAssetsBySid,
@@ -162,6 +167,9 @@ async function writeStructureDb({
     }
     if (assets.length) {
         writer.insertAssets(assets);
+    }
+    if (blobs.length) {
+        writer.insertBlobs(blobs);
     }
 }
 
@@ -528,8 +536,6 @@ function persistAssets(db, assets, assetsSchema, options) {
         uid: asset.uid,
         type: asset.type ?? null,
         blob_hash: asset.blob_hash ?? null,
-        blob_size: asset.blob_size ?? null,
-        blob_path: asset.blob_path ?? null,
         parent_doc_uid: asset.parent_doc_uid ?? null,
         path: asset.path ?? null,
         ext: asset.ext ?? null,
@@ -537,6 +543,20 @@ function persistAssets(db, assets, assetsSchema, options) {
         last_seen: asset.last_seen ?? null
     }));
     insertRows(db, 'assets', assetsSchema.insertColumns, rows, options);
+}
+
+function persistBlobs(db, blobs, blobsSchema, options) {
+    if (!blobs.length) {
+        return;
+    }
+    const rows = blobs.map((blob) => ({
+        hash: blob.hash,
+        size: blob.size ?? null,
+        path: blob.path ?? null,
+        first_seen: blob.first_seen ?? null,
+        last_seen: blob.last_seen ?? null
+    }));
+    insertRows(db, 'blobs', blobsSchema.insertColumns, rows, options);
 }
 
 function serializeList(list) {

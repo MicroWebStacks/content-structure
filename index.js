@@ -1,4 +1,4 @@
-import {join} from 'path'
+import { join } from 'path'
 import { exists, exists_public, file_ext } from './src/utils.js';
 import {get_images_info,get_codes_info,get_tables_info,get_links_info} from './src/md_utils.js'
 import {iterate_documents, set_config, tree_content} from './src/collect.js'
@@ -37,6 +37,7 @@ async function collect(config){
     const assetIndex = Object.create(null)
     const documentIndex = Object.create(null)
     const blobManager = createBlobManager(runTimestamp)
+    const blobCatalog = new Map()
 
     const originalCwd = process.cwd()
     try{
@@ -65,12 +66,15 @@ async function collect(config){
 
             await annotateAssets(assetList,config)
             stampAssets(assetList, runTimestamp)
-            await attachBlobsToAssets(assetList, blobManager)
+            await attachBlobsToAssets(assetList, blobManager, blobCatalog, runTimestamp)
             writer.insertDocument(entry,content,tree,assetList)
             if(assetList.length > 0){
                 writer.insertAssets(assetList)
                 addAssetsToIndex(assetIndex,assetList)
             }
+        }
+        if(blobCatalog.size > 0){
+            writer.insertBlobs(Array.from(blobCatalog.values()))
         }
     }finally{
         process.chdir(originalCwd)
@@ -130,7 +134,7 @@ function stampAssets(assets,timestamp){
     }
 }
 
-async function attachBlobsToAssets(assets,blobManager){
+async function attachBlobsToAssets(assets,blobManager,blobCatalog = new Map(),timestamp){
     if(!blobManager){
         return
     }
@@ -143,8 +147,11 @@ async function attachBlobsToAssets(assets,blobManager){
             const result = await blobManager.ensureFromBuffer(buffer)
             if(result){
                 asset.blob_hash = result.hash
-                asset.blob_size = result.size ?? buffer.length
-                asset.blob_path = result.path ?? null
+                recordBlobMetadata(blobCatalog,{
+                    hash:result.hash,
+                    size:result.size ?? buffer.length,
+                    path:result.path ?? null
+                },timestamp)
             }
             continue
         }
@@ -153,14 +160,37 @@ async function attachBlobsToAssets(assets,blobManager){
                 const result = await blobManager.ensureFromFile(asset.abs_path)
                 if(result){
                     asset.blob_hash = result.hash
-                    asset.blob_size = result.size ?? null
-                    asset.blob_path = result.path ?? null
+                    recordBlobMetadata(blobCatalog,{
+                        hash:result.hash,
+                        size:result.size ?? null,
+                        path:result.path ?? null
+                    },timestamp)
                 }
             }catch(error){
                 warn(`(X) failed to create blob for '${asset.path}': ${error.message}`)
             }
         }
     }
+}
+
+function recordBlobMetadata(blobCatalog,data,timestamp){
+    if(!data || !data.hash){
+        return
+    }
+    const existing = blobCatalog.get(data.hash) ?? {hash:data.hash}
+    if(Number.isFinite(data.size)){
+        existing.size = data.size
+    }
+    if(data.path){
+        existing.path = data.path
+    }
+    if(timestamp){
+        if(!existing.first_seen){
+            existing.first_seen = timestamp
+        }
+        existing.last_seen = timestamp
+    }
+    blobCatalog.set(data.hash,existing)
 }
 
 
