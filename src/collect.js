@@ -16,6 +16,11 @@ let config = {
     folder_single_doc:false
 }
 
+const KNOWN_ENTRY_FIELDS = new Set([
+    'title','slug','order','description','date','lastmod','image','tags','features'
+])
+
+
 function get_slug(data,path,url_type){
     if(Object.hasOwn(data,"slug")){
         return data.slug
@@ -130,18 +135,16 @@ function get_url_type(file_path){
 async function createMarkdownDocumentSource(file_path){
     const url_type = get_url_type(file_path)
     const markdownText = await load_text(file_path)
-    const {data, content} = matter(markdownText)
-    const slug = get_slug(data,file_path,url_type)
+    const {data} = matter(markdownText)
+    const {entryFields, modelFields} = partitionFrontmatter(data ?? {})
+
+    const slug = get_slug(entryFields,file_path,url_type)
     const url = entry_to_url(url_type,file_path,slug)
     const uid = buildDocumentUid(url, slug, file_path)
     const sid = shortMD5(uid)
     const level = entry_to_level(url_type,file_path)
     const base_dir = getDocumentBaseDir(file_path)
-    const modelData = {...data}
-    const title = Object.hasOwn(modelData,"title") ? modelData.title : slug
-    if(Object.hasOwn(modelData,"title")){
-        delete modelData.title
-    }
+    const title = entryFields.title ?? slug
     const entry = {
         sid,
         uid,
@@ -151,11 +154,10 @@ async function createMarkdownDocumentSource(file_path){
         slug,
         title,
         level,
-        base_dir,
-        model:null,
-        ...modelData
+        base_dir
     }
-    const modelAsset = createFrontmatterAsset(entry, data)
+    applyEntryOverrides(entry, entryFields)
+    const modelAsset = createFrontmatterAsset(entry, modelFields)
     if(modelAsset){
         entry.model = modelAsset.uid
     }
@@ -253,10 +255,8 @@ function getDocumentBaseDir(file_path){
 }
 
 function createFrontmatterAsset(entry, frontmatter){
-    if(!frontmatter){
-        return null
-    }
-    const keys = Object.keys(frontmatter)
+    const payload = frontmatter ?? {}
+    const keys = Object.keys(payload)
     if(keys.length === 0){
         return null
     }
@@ -267,7 +267,7 @@ function createFrontmatterAsset(entry, frontmatter){
         sid:shortMD5(uid),
         document:entry.sid,
         parent_doc_uid:entry.uid,
-        blob_content:JSON.stringify(frontmatter)
+        blob_content:JSON.stringify(payload)
     }
     return asset
 }
@@ -360,6 +360,28 @@ async function check_add_assets(asset_list,content_assets){
                 path:filepath
             })
         }
+    }
+}
+
+function partitionFrontmatter(frontmatter = {}){
+    const entryFields = {}
+    const modelFields = {}
+    for(const [key,value] of Object.entries(frontmatter)){
+        if(KNOWN_ENTRY_FIELDS.has(key)){
+            entryFields[key] = value
+        }else{
+            modelFields[key] = value
+        }
+    }
+    return {entryFields, modelFields}
+}
+
+function applyEntryOverrides(entry, entryFields){
+    for(const key of KNOWN_ENTRY_FIELDS){
+        if((key === 'title' || key === 'slug') || !Object.hasOwn(entryFields,key)){
+            continue
+        }
+        entry[key] = entryFields[key]
     }
 }
 
