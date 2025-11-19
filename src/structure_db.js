@@ -108,19 +108,18 @@ async function createStructureDbWriter(options = {}) {
     }
     const documentsSchema = requireTableSchema(schema, 'documents');
     const assetsSchema = requireTableSchema(schema, 'assets');
-    const blobsSchema = requireTableSchema(schema, 'blobs');
     const itemsSchema = requireTableSchema(schema, 'items');
-    const itemAssetsSchema = requireTableSchema(schema, 'item_assets');
+    const assetVersionSchema = requireTableSchema(schema, 'asset_version');
     runInTransaction(db, () => {
         createTables(db, schema);
         syncTableColumns(db, schema);
         resetTables(db, schema);
     });
     const insertDocumentTx = db.transaction((payload) => {
-        const {row, items, itemAssets} = payload;
+        const {row, items, assetVersions} = payload;
         persistDocuments(db, [row], documentsSchema, {transaction: false});
         persistSimpleRows(db, 'items', itemsSchema.insertColumns, items, {transaction: false});
-        persistSimpleRows(db, 'item_assets', itemAssetsSchema.insertColumns, itemAssets, {transaction: false});
+        persistSimpleRows(db, 'asset_version', assetVersionSchema.insertColumns, assetVersions, {transaction: false});
     });
     return {
         insertDocument(entry, content, tree, assets) {
@@ -134,9 +133,6 @@ async function createStructureDbWriter(options = {}) {
             });
             insertDocumentTx(payload);
         },
-        insertBlobs(blobsList = []) {
-            persistBlobs(db, blobsList, blobsSchema);
-        },
         insertAssets(assetsList = []) {
             persistAssets(db, assetsList, assetsSchema);
         },
@@ -146,7 +142,6 @@ async function createStructureDbWriter(options = {}) {
 async function writeStructureDb({
     documents = [],
     assets = [],
-    blobs = [],
     documentContents,
     documentTrees,
     documentAssetsBySid,
@@ -167,9 +162,6 @@ async function writeStructureDb({
     }
     if (assets.length) {
         writer.insertAssets(assets);
-    }
-    if (blobs.length) {
-        writer.insertBlobs(blobs);
     }
 }
 
@@ -212,7 +204,7 @@ function buildDocumentRow(doc, content, documentSchema, options = {}) {
     return {
         row,
         items: itemsResult.rows,
-        itemAssets: itemsResult.assets
+        assetVersions: itemsResult.assetVersions
     };
 }
 
@@ -261,18 +253,18 @@ function buildItemRows(doc, content, options = {}) {
         }
     }
     const rows = [];
-    const itemAssets = [];
+    const assetVersions = [];
+    const recordedAssetKeys = new Set();
     let orderIndex = 0;
     let headingCursor = 0;
     let tableCursor = 0;
     let imageCursor = 0;
     let codeCursor = 0;
 
-    function pushRow({type, text, level, assetRefs = []}) {
+    function pushRow({type, text, level}) {
         const sanitizedText = typeof text === 'string' ? text : '';
         const itemOrder = orderIndex;
         const itemUid = formatItemUid(doc.sid, itemOrder);
-        const assetUidList = attachAssetRefs(assetRefs, itemUid);
         rows.push({
             uid: itemUid,
             version_id: versionId,
@@ -280,41 +272,54 @@ function buildItemRows(doc, content, options = {}) {
             type,
             level: Number.isFinite(level) ? level : null,
             order_index: itemOrder,
-            body_text: sanitizedText.length ? sanitizedText : null,
-            asset_uids: serializeList(assetUidList)
+            body_text: sanitizedText.length ? sanitizedText : null
         });
         orderIndex += 1;
     }
 
-    function attachAssetRefs(assetRefs, itemUid) {
-        if (!assetRefs?.length) {
-            return [];
-        }
-        const assetUidList = [];
-        assetRefs.forEach((ref) => {
-            if (!ref?.uid) {
-                return;
-            }
-            assetUidList.push(ref.uid);
-            const asset = assetMap.get(ref.uid);
-            itemAssets.push({
-                ref_id_in_body: ref.refId,
-                version_id: versionId,
-                doc_sid: doc.sid,
-                asset_uid: ref.uid,
-                blob_hash: asset?.blob_hash ?? null,
-                role: ref.role ?? null
-            });
-        });
-        return assetUidList;
-    }
-
-    function createAssetRef(assetUid, role, itemOrder, assetIndex = 0) {
-        if (!assetUid || !assetMap.has(assetUid)) {
+    function recordAssetVersion(assetUid, role) {
+        if (!assetUid) {
             return null;
         }
-        const refId = buildRefId(doc.sid, versionId, itemOrder, assetIndex);
-        return {uid: assetUid, role, refId};
+        const asset = assetMap.get(assetUid);
+        if (!asset) {
+            return null;
+        }
+        const key = assetUid;
+        if (!recordedAssetKeys.has(key)) {
+            recordedAssetKeys.add(key);
+            assetVersions.push({
+                asset_uid: asset.uid,
+                version_id: versionId,
+                doc_sid: doc.sid,
+                blob_hash: asset.blob_hash ?? null,
+                role: role ?? null
+            });
+        }
+        return asset;
+    }
+
+    function createAssetLink(assetUid, role, labelText) {
+        const asset = recordAssetVersion(assetUid, role);
+        if (!asset) {
+            return null;
+        }
+        const normalizedLabel = formatAssetLabel(labelText, asset.uid);
+        const schemeType = formatAssetType(asset.type);
+        return `![${normalizedLabel}](asset://${schemeType}/${asset.uid})`;
+    }
+
+    function formatAssetLabel(labelText, fallback) {
+        const raw = typeof labelText === 'string' ? labelText.trim() : '';
+        const base = raw || fallback || 'asset';
+        return base.replace(/[\[\]]/g, '');
+    }
+
+    function formatAssetType(type) {
+        if (!type) {
+            return 'asset';
+        }
+        return String(type).trim().replace(/[^a-zA-Z0-9_.-]+/g, '-').toLowerCase();
     }
 
     function processNode(node) {
@@ -351,8 +356,7 @@ function buildItemRows(doc, content, options = {}) {
         pushRow({
             type: 'heading',
             text,
-            level,
-            assetRefs: []
+            level
         });
     }
 
@@ -366,8 +370,7 @@ function buildItemRows(doc, content, options = {}) {
                 pushRow({
                     type: 'paragraph',
                     text: fallbackText,
-                    level,
-                    assetRefs: []
+                    level
                 });
             }
             return;
@@ -378,8 +381,7 @@ function buildItemRows(doc, content, options = {}) {
                     pushRow({
                         type: 'paragraph',
                         text: segment.value,
-                        level,
-                        assetRefs: []
+                        level
                     });
                 }
                 return;
@@ -394,24 +396,14 @@ function buildItemRows(doc, content, options = {}) {
         const tableEntry = tables[tableCursor++] ?? {};
         const line = getNodeLine(node);
         const level = getLevelForLine(line);
-        const itemOrder = orderIndex;
-        const assetRefs = [];
-        let placeholder = '';
-        if (tableEntry.uid) {
-            const ref = createAssetRef(tableEntry.uid, 'table_data', itemOrder, assetRefs.length);
-            if (ref) {
-                assetRefs.push(ref);
-                placeholder = formatAssetPlaceholder(ref.refId);
-            }
-        }
         const descriptionValue = tableEntry.text ?? tableEntry.id ?? 'table';
         const description = String(descriptionValue).trim();
-        const text = placeholder ? `${description} ${placeholder}`.trim() : description;
+        const assetLink = createAssetLink(tableEntry.uid, 'table_data', description);
+        const text = assetLink ?? (description || 'table');
         pushRow({
             type: 'table',
             text,
-            level,
-            assetRefs
+            level
         });
     }
 
@@ -419,24 +411,14 @@ function buildItemRows(doc, content, options = {}) {
         const codeEntry = codeBlocks[codeCursor++] ?? {};
         const line = getNodeLine(node);
         const level = getLevelForLine(line);
-        const itemOrder = orderIndex;
-        const assetRefs = [];
-        let placeholder = '';
-        if (codeEntry.uid) {
-            const ref = createAssetRef(codeEntry.uid, 'code_block', itemOrder, assetRefs.length);
-            if (ref) {
-                assetRefs.push(ref);
-                placeholder = formatAssetPlaceholder(ref.refId);
-            }
-        }
         const language = codeEntry.language ?? node.lang ?? 'code';
         const label = `code(${language})`;
-        const text = placeholder ? `${label} ${placeholder}`.trim() : label;
+        const assetLink = createAssetLink(codeEntry.uid, 'code_block', label);
+        const text = assetLink ?? label;
         pushRow({
             type: 'code',
             text,
-            level,
-            assetRefs
+            level
         });
     }
 
@@ -444,16 +426,6 @@ function buildItemRows(doc, content, options = {}) {
         const imageEntry = images[imageCursor++] ?? {};
         const line = lineOverride ?? getNodeLine(node);
         const level = typeof levelOverride === 'number' ? levelOverride : getLevelForLine(line);
-        const itemOrder = orderIndex;
-        const assetRefs = [];
-        let placeholder = '';
-        if (imageEntry.uid) {
-            const ref = createAssetRef(imageEntry.uid, 'inline_image', itemOrder, assetRefs.length);
-            if (ref) {
-                assetRefs.push(ref);
-                placeholder = formatAssetPlaceholder(ref.refId);
-            }
-        }
         const labelParts = [];
         if (imageEntry.title) {
             labelParts.push(String(imageEntry.title));
@@ -462,12 +434,12 @@ function buildItemRows(doc, content, options = {}) {
             labelParts.push(String(imageEntry.alt));
         }
         const label = labelParts.join(' ').trim() || 'image';
-        const text = placeholder ? `${label} ${placeholder}`.trim() : label;
+        const assetLink = createAssetLink(imageEntry.uid, 'inline_image', label);
+        const text = assetLink ?? label;
         pushRow({
             type: 'image',
             text,
-            level,
-            assetRefs
+            level
         });
     }
 
@@ -509,22 +481,12 @@ function buildItemRows(doc, content, options = {}) {
     }
 
     tree.children.forEach(processNode);
-    return {rows, assets: itemAssets};
+    return {rows, assetVersions};
 }
 
 function formatItemUid(docSid, orderIndex) {
     const orderStr = String(orderIndex + 1).padStart(4, '0');
     return `${docSid}-I${orderStr}`;
-}
-
-function buildRefId(docSid, versionId, orderIndex, assetIndex) {
-    const orderStr = String(orderIndex + 1).padStart(4, '0');
-    const assetStr = String(assetIndex + 1).padStart(2, '0');
-    return `${versionId}-${docSid}-I${orderStr}-A${assetStr}`;
-}
-
-function formatAssetPlaceholder(refId) {
-    return `{{asset:${refId}}}`;
 }
 
 function getNodeLine(node) {
@@ -566,6 +528,8 @@ function persistAssets(db, assets, assetsSchema, options) {
         uid: asset.uid,
         type: asset.type ?? null,
         blob_hash: asset.blob_hash ?? null,
+        blob_size: asset.blob_size ?? null,
+        blob_path: asset.blob_path ?? null,
         parent_doc_uid: asset.parent_doc_uid ?? null,
         path: asset.path ?? null,
         ext: asset.ext ?? null,
@@ -573,22 +537,6 @@ function persistAssets(db, assets, assetsSchema, options) {
         last_seen: asset.last_seen ?? null
     }));
     insertRows(db, 'assets', assetsSchema.insertColumns, rows, options);
-}
-
-function persistBlobs(db, blobs, blobsSchema, options) {
-    if (!blobs.length) {
-        return;
-    }
-    const rows = blobs.map((blob) => ({
-        hash: blob.hash,
-        size: blob.size ?? null,
-        first_seen: blob.first_seen ?? null,
-        last_seen: blob.last_seen ?? null,
-        year: blob.year ?? null,
-        month: blob.month ?? null,
-        prefix: blob.prefix ?? null
-    }));
-    insertRows(db, 'blobs', blobsSchema.insertColumns, rows, options);
 }
 
 function serializeList(list) {

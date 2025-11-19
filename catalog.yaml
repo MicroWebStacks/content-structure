@@ -30,15 +30,13 @@ datasets:
           - { name: type, type: string, description: Item type such as heading, paragraph, table, code, or image }
           - { name: level, type: int, description: Approximate nesting or heading depth derived from the AST }
           - { name: order_index, type: int, description: Order of appearance within the document }
-          - { name: body_text, type: string, description: Textual body with inline asset references expressed as placeholders }
-          - { name: asset_uids, type: string_list, description: JSON list of asset UIDs associated with the item }
-      - name: item_assets
-        description: Strong references between items and stored assets/blobs for reconstructing embedded content.
+          - { name: body_text, type: string, description: Textual body with inline asset references expressed as asset:// links }
+      - name: asset_version
+        description: Version-specific rows that connect each document asset to the collection run for downstream joins.
         columns:
-          - { name: ref_id_in_body, type: string, primary: true, description: Placeholder identifier inserted into the related item body }
+          - { name: asset_uid, type: string, primary: true, description: UID of the referenced asset as stored in the assets table }
           - { name: version_id, type: string, description: Encoded seconds-since-2000 identifier for the collection run }
           - { name: doc_sid, type: string, description: SID of the document that owns the item }
-          - { name: asset_uid, type: string, description: UID of the referenced asset as stored in the assets table }
           - { name: blob_hash, type: string, description: SHA-512 hash of the referenced blob }
           - { name: role, type: string, description: Role of the asset within the item such as inline_image, table_data, or code_block }
       - name: assets
@@ -46,19 +44,11 @@ datasets:
         columns:
           - { name: uid, type: string, primary: true, description: Stable identifier composed from the document uid and asset slug }
           - { name: type, type: string, values: [file, codeblock, table, model], description: Asset type such as codeblock, table, file, or model }
-          - { name: blob_hash, type: string, description: SHA-512 hash pointing to the corresponding row in the blobs table }
+          - { name: blob_hash, type: string, description: SHA-512 hash identifying the stored blob payload }
+          - { name: blob_size, type: int, description: Size of the stored blob in bytes }
+          - { name: blob_path, type: string, description: Relative path including the blobs/year/month/prefix layout }
           - { name: parent_doc_uid, type: string, description: UID of the document that introduced the asset }
           - { name: path, type: string, description: Source-relative path for file-backed assets }
           - { name: ext, type: string, description: File extension for referenced files when available }
           - { name: first_seen, type: string, description: ISO timestamp when the asset was first observed }
           - { name: last_seen, type: string, description: ISO timestamp when the asset was most recently observed }
-      - name: blobs
-        description: Deduplicated blob store capturing the binary representation of every asset payload.
-        columns:
-          - { name: hash, type: string, primary: true, description: SHA-512 hash of the blob contents }
-          - { name: size, type: int, description: Size of the blob in bytes }
-          - { name: first_seen, type: string, description: ISO timestamp when the blob was first created }
-          - { name: last_seen, type: string, description: ISO timestamp when the blob was last confirmed }
-          - { name: year, type: int, description: UTC year extracted from the first_seen timestamp }
-          - { name: month, type: int, description: UTC month extracted from the first_seen timestamp }
-          - { name: prefix, type: string, description: First two hexadecimal characters of the blob hash used in the path layout }

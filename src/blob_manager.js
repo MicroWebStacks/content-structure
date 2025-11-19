@@ -19,7 +19,7 @@ function getDateParts(timestamp) {
 class BlobManager {
     constructor(timestamp) {
         this.timestamp = timestamp ?? new Date().toISOString();
-        this.hashIndex = new Map(); // hash -> {row, relativePath}
+        this.hashIndex = new Map(); // hash -> {relativePath, size}
     }
 
     async ensureFromBuffer(buffer) {
@@ -27,29 +27,22 @@ class BlobManager {
             return null;
         }
         const hash = createHash('sha512').update(buffer).digest('hex');
-        let entry = this.hashIndex.get(hash);
-        if (!entry) {
+        const existing = this.hashIndex.get(hash);
+        if (!existing) {
             const {year, month} = getDateParts(this.timestamp);
             const prefix = hash.slice(0, 2);
             const relDir = ['blobs', String(year), formatMonth(month), prefix].join('/');
             await check_dir_create(relDir);
             const relativePath = `${relDir}/${hash}`;
             await this.writeBlob(relativePath, buffer);
-            const row = {
-                hash,
-                size: buffer.length,
-                first_seen: this.timestamp,
-                last_seen: this.timestamp,
-                year,
-                month,
-                prefix
+            const entry = {
+                relativePath,
+                size: buffer.length
             };
-            entry = {row, relativePath};
             this.hashIndex.set(hash, entry);
-        } else {
-            entry.row.last_seen = this.timestamp;
+            return {hash, size: entry.size, path: entry.relativePath};
         }
-        return {hash, relativePath: entry.relativePath};
+        return {hash, size: existing.size, path: existing.relativePath};
     }
 
     async ensureFromFile(absPath) {
@@ -69,10 +62,6 @@ class BlobManager {
         }
         await writeFile(absPath, buffer);
     }
-
-    getRows() {
-        return Array.from(this.hashIndex.values()).map((entry) => entry.row);
-    }
 }
 
 function createBlobManager(timestamp) {
@@ -82,4 +71,3 @@ function createBlobManager(timestamp) {
 export {
     createBlobManager
 };
-

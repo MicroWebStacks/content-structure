@@ -76,10 +76,6 @@ async function collect(config){
         process.chdir(originalCwd)
     }
 
-    const blobRows = blobManager.getRows()
-    if(blobRows.length > 0){
-        writer.insertBlobs(blobRows)
-    }
 }
 
 async function annotateAssets(assets,config){
@@ -147,6 +143,8 @@ async function attachBlobsToAssets(assets,blobManager){
             const result = await blobManager.ensureFromBuffer(buffer)
             if(result){
                 asset.blob_hash = result.hash
+                asset.blob_size = result.size ?? buffer.length
+                asset.blob_path = result.path ?? null
             }
             continue
         }
@@ -155,6 +153,8 @@ async function attachBlobsToAssets(assets,blobManager){
                 const result = await blobManager.ensureFromFile(asset.abs_path)
                 if(result){
                     asset.blob_hash = result.hash
+                    asset.blob_size = result.size ?? null
+                    asset.blob_path = result.path ?? null
                 }
             }catch(error){
                 warn(`(X) failed to create blob for '${asset.path}': ${error.message}`)

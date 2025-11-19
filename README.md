@@ -70,7 +70,7 @@ When `folder_single_doc` is enabled in the configuration, every folder is treate
 1. All markdown files inside the folder are concatenated alphabetically and parsed as one document. Front matter is ignored.
 2. The first YAML/YML file inside the same folder becomes the document model asset (`<document uid>#filename.ext`).
 
-Model assets are stored in the `assets` table like any other blob/file. Their UID can be used to fetch the actual payload via the blobs table.
+Model assets are stored in the `assets` table like any other blob/file. Their UID can be used to fetch the actual payload via the blob hash/size/path columns on the same row.
 
 ### URL type
 Content structure allows both file and folder URL types to be used at the same time without the need of user configuration.  
@@ -109,10 +109,10 @@ the config parameter is optional and do have default values
     * `tree.json` the raw output of the remark AST parser
     * content.json with the parameters and parsed content parameters
 * `.structure/structure.db` : a SQLite database (powered by better-sqlite3) that mirrors the JSON output.  
-  The database exposes the tables `documents`, `assets`, `items`, and `item_assets`.  
+  The database exposes the tables `documents`, `assets`, `items`, and `asset_version`.  
   Repeating values are normalised into dedicated tables, while any retained list uses a `*_list` column that stores a JSON string of the related ids.  
-  Items flatten the AST of every markdown document using a stable `version_id` per run, while `item_assets` keep strong links from inline placeholders back to the deduplicated blobs.  
-  Asset rows now declare a `type` (`file`, `table`, `codeblock`, or `model`), and only locally referenced files carry an `ext` entry.
+  Items flatten the AST of every markdown document using a stable `version_id` per run and now embed inline asset references directly as `asset://type/asset_uid` Markdown tokens.  
+  `asset_version` rows keep per-run joins between assets and documents without placeholder ids, and asset rows now store the blob hash, byte size, and resolved blobs path (built from the year/month/prefix layout) next to their existing metadata.
 
 ## Example generated output
 
