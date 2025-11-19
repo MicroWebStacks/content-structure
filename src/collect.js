@@ -323,22 +323,6 @@ async function tree_content(markdown_text,entry_details){
     return {tree,content:entry_details}
 }
 
-//unused internally, exported service
-async function parse_markdown(markdown,path){
-    const entry_details = {
-        path:path,
-        uid:path,//for images uid assignments
-        sid:shortMD5(path)
-    }
-    return tree_content(markdown,entry_details)
-}
-
-async function parse_document(entry, options = {}){
-    const entry_details = JSON.parse(JSON.stringify(entry))
-    const markdown_text = options.markdownText ?? await load_text(entry.path)
-    return tree_content(markdown_text,entry_details)
-}
-
 async function check_add_assets(asset_list,content_assets){
     const config = get_config()
     const referenced_locals = new Set()
@@ -408,11 +392,10 @@ function get_config(){
 }
 
 export{
-    parse_document,
     check_add_assets,
     set_config,
     get_config,
-    parse_markdown,
     shortMD5,
-    iterate_documents
+    iterate_documents,
+    tree_content
 }

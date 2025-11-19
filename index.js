@@ -1,8 +1,7 @@
 import {join} from 'path'
 import { exists, exists_public, file_ext } from './src/utils.js';
 import {get_file_links_info,get_codes_info,get_tables_info} from './src/md_utils.js'
-import {parse_document,iterate_documents,
-        set_config,parse_markdown} from './src/collect.js'
+import {iterate_documents, set_config, tree_content} from './src/collect.js'
 import { debug, warn } from './src/libs/log.js';
 import { createStructureDbWriter } from './src/structure_db.js';
 import { createBlobManager } from './src/blob_manager.js';
@@ -18,6 +17,10 @@ function decodePathValue(pathValue){
         warn(`(X) failed to decode path '${pathValue}': ${error.message}`)
         return pathValue
     }
+}
+
+function cloneEntry(entry){
+    return JSON.parse(JSON.stringify(entry))
 }
 
 async function collect(config){
@@ -55,7 +58,8 @@ async function collect(config){
                 uid:entry.uid
             }
             debug(` parsing sid: ${entry.sid} path: ${entry.path}`)
-            const {tree,content} = await parse_document(entry,{markdownText})
+            const entryDetails = cloneEntry(entry)
+            const {tree,content} = await tree_content(markdownText,entryDetails)
             const assetList = []
             if(modelAsset){
                 assetList.push(modelAsset)
@@ -168,6 +172,5 @@ async function attachBlobsToAssets(assets,blobManager){
 
 export{
     collect,
-    set_config,
-    parse_markdown
+    set_config
 }
