@@ -3,7 +3,7 @@ import { relative, resolve, join, sep, basename, dirname, parse, extname } from 
 import { load_text,exists,exists_public } from './utils.js';
 import { md_tree, title_slug, extract_headings,
     extract_tables,extract_images,extract_code,
-    extract_paragraphs, extract_links,extract_refs } from './md_utils.js';
+    extract_paragraphs, extract_links } from './md_utils.js';
 import matter from 'gray-matter';
 import { createHash } from 'crypto';
 import {warn} from './libs/log.js'
@@ -328,8 +328,6 @@ async function tree_content(markdown_text,entry_details){
     entry_details.paragraphs = paragraphs
     const links = extract_links(tree,headings)
     entry_details.links = links
-    const references = extract_refs(tree,headings)
-    entry_details.references = references
 
     return {tree,content:entry_details}
 }

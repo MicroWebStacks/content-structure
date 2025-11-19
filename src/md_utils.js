@@ -8,7 +8,7 @@ import remarkGfm from 'remark-gfm';
 import {join} from 'path'
 import { exists } from './utils.js';
 import { JSDOM } from 'jsdom';
-import { shortMD5 } from './collect.js';
+import { shortMD5, get_config } from './collect.js';
 import { debug, warn } from './libs/log.js';
 
 async function get_image_text(path){
@@ -275,16 +275,23 @@ async function extract_images(tree, headings,entry) {
    return images_list;
 }
 
-function get_file_links_info(entry,content){
+async function get_images_info(entry,content){
     const file_links = []
-    if(content.images.length > 0){
+    if((content.images ?? []).length > 0){
         for(const image of content.images){
             if(isExternalAssetUrl(image.url)){
                 continue
             }
             const path = resolveDocumentAssetPath(entry,image.url)
+            if(!path || path.startsWith('/')){
+                continue
+            }
+            const existsLocally = await exists(path)
+            if(!existsLocally){
+                continue
+            }
             file_links.push({
-                type:"file",
+                type:"image",
                 uid:image.uid,
                 sid:image.sid,
                 document:entry.sid,
@@ -369,16 +376,56 @@ function extract_links(tree,headings){
     return links_list
 }
 
-function extract_refs(tree,headings){
-    let refs_list = []
-    visit(tree, 'reference',node=> {
-        refs_list.push({
-            heading:heading_from_line(headings,node.position.start.line),
-            type:node.ref_type,
-            value:node.ref_value
+async function get_links_info(entry, content){
+    const links = content?.links ?? []
+    if(links.length === 0){
+        return []
+    }
+    const {file_link_ext = []} = get_config() ?? {}
+    if(!Array.isArray(file_link_ext) || file_link_ext.length === 0){
+        return []
+    }
+    const allowedExtensions = new Set(file_link_ext.map(ext => typeof ext === 'string' ? ext.toLowerCase() : '').filter(Boolean))
+    if(allowedExtensions.size === 0){
+        return []
+    }
+    const assets = []
+    for(const link of links){
+        const rawUrl = typeof link.url === 'string' ? link.url.trim() : ''
+        if(!rawUrl){
+            continue
+        }
+        if(isExternalAssetUrl(rawUrl)){
+            continue
+        }
+        if(rawUrl.startsWith('/')){
+            continue
+        }
+        const extension = file_ext(rawUrl).toLowerCase()
+        if(!allowedExtensions.has(extension)){
+            continue
+        }
+        const path = resolveDocumentAssetPath(entry,rawUrl)
+        if(!path || path.startsWith('/')){
+            continue
+        }
+        const existsLocally = await exists(path)
+        if(!existsLocally){
+            continue
+        }
+        const assetId = link.id ? `link-${link.id}` : `link-${shortMD5(rawUrl)}`
+        const uid = `${entry.uid}#${assetId}`
+        assets.push({
+            type:"linked_file",
+            uid,
+            sid:shortMD5(uid),
+            document:entry.sid,
+            parent_doc_uid:entry.uid,
+            path:path,
+            ext:extension
         })
-    })
-    return refs_list
+    }
+    return assets
 }
 
 export{
@@ -389,12 +436,12 @@ export{
     extract_code,
     extract_paragraphs,
     extract_links,
+    get_links_info,
     node_text_list,
     node_slug,
     title_slug,
     node_text,
-    extract_refs,
-    get_file_links_info,
+    get_images_info,
     get_tables_info,
     get_codes_info
 }

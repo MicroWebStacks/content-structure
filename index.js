@@ -1,6 +1,6 @@
 import {join} from 'path'
 import { exists, exists_public, file_ext } from './src/utils.js';
-import {get_file_links_info,get_codes_info,get_tables_info} from './src/md_utils.js'
+import {get_images_info,get_codes_info,get_tables_info,get_links_info} from './src/md_utils.js'
 import {iterate_documents, set_config, tree_content} from './src/collect.js'
 import { debug, warn } from './src/libs/log.js';
 import { createStructureDbWriter } from './src/structure_db.js';
@@ -57,11 +57,12 @@ async function collect(config){
             if(modelAsset){
                 assetList.push(modelAsset)
             }
-            assetList.push(
-                ...get_file_links_info(entry,content),
-                ...get_tables_info(entry,content),
-                ...get_codes_info(entry,content)
-            )
+            const imageAssets = await get_images_info(entry,content)
+            const tableAssets = get_tables_info(entry,content)
+            const codeAssets = get_codes_info(entry,content)
+            const linkAssets = await get_links_info(entry,content)
+            assetList.push(...imageAssets,...tableAssets,...codeAssets,...linkAssets)
+
             await annotateAssets(assetList,config)
             stampAssets(assetList, runTimestamp)
             await attachBlobsToAssets(assetList, blobManager)
