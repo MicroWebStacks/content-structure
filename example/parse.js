@@ -8,8 +8,7 @@ const rootdir = dirname(fileURLToPath(import.meta.url))
 await collect({
     rootdir:rootdir,
     contentdir:join(rootdir,"content"),
-    content_ext:["md","json","yml","yaml"],
-    assets_ext:["svg","webp","png","jpeg","jpg","xlsx","glb"],
+    file_link_ext:["svg","webp","png","jpeg","jpg","xlsx","glb"],
     outdir:join(rootdir,".structure"),
     debug:false
 })

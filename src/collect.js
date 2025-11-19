@@ -14,8 +14,7 @@ let config = {
     contentdir: "content",
     outdir: ".structure",
     debug:false,
-    folder_single_doc:false,
-    content_ext:['md']
+    folder_single_doc:false
 }
 
 function get_slug(data,path,url_type){
@@ -169,10 +168,7 @@ async function createMarkdownDocumentSource(file_path){
 }
 
 async function* collectMarkdownFileDocuments(){
-    for await (const file_path of get_all_files(config.content_ext)){
-        if(extname(file_path).toLowerCase() !== '.md'){
-            continue
-        }
+    for await (const file_path of get_all_files(['md'])){
         const source = await createMarkdownDocumentSource(file_path)
         if(source){
             yield source
@@ -180,11 +176,11 @@ async function* collectMarkdownFileDocuments(){
     }
 }
 
-const MODEL_FILE_EXTENSIONS = new Set(['.yaml','.yml','.json'])
+const MODEL_FILE_EXTENSIONS = new Set(['.yaml','.yml'])
 
 async function* collectSingleFolderDocuments(){
     const buckets = new Map()
-    for await (const file_path of get_all_files(config.content_ext)){
+    for await (const file_path of get_all_files()){
         const extension = extname(file_path).toLowerCase()
         if(extension !== '.md' && !MODEL_FILE_EXTENSIONS.has(extension)){
             continue
@@ -396,9 +392,6 @@ function set_config(new_config){
         }
         if(config.folder_single_doc === undefined){
             config.folder_single_doc = false
-        }
-        if(!Array.isArray(config.content_ext) || config.content_ext.length === 0){
-            config.content_ext = ['md']
         }
         if(config.debug){
             console.log("config:")

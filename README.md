@@ -68,10 +68,9 @@ In multi-document mode (default) a document model is generated from the markdown
 When `folder_single_doc` is enabled in the configuration, every folder is treated as a single document:
 
 1. All markdown files inside the folder are concatenated alphabetically and parsed as one document. Front matter is ignored.
-2. The first YAML/YML/JSON file inside the same folder becomes the document model asset (`<document uid>#filename.ext`).
+2. The first YAML/YML file inside the same folder becomes the document model asset (`<document uid>#filename.ext`).
 
 Model assets are stored in the `assets` table like any other blob/file. Their UID can be used to fetch the actual payload via the blobs table.
-When using `folder_single_doc`, ensure that `content_ext` contains the extensions of the model files you expect to pick up (for example `["md","yml","yaml","json"]`).
 
 ### URL type
 Content structure allows both file and folder URL types to be used at the same time without the need of user configuration.  
@@ -94,7 +93,7 @@ The field `url_type` will also be exposed for the user as in the example entry b
 the config parameter is optional and do have default values
 * `rootdir` : defaults to current working directory. The path where to find the a `content` directory.
 * `outdir` : defaults to `.structure`. Relative output directory is the location where all output data will be generated, which is relative to the root directory.
-* `folder_single_doc` : defaults to `false`. When `true`, each folder is treated as a single document and the first YAML/YML/JSON file becomes the document model asset.
+* `folder_single_doc` : defaults to `false`. When `true`, each folder is treated as a single document and the first YAML/YML file becomes the document model asset.
 
 ## Generated output
 * `gen/document_list.json`

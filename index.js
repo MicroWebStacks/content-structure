@@ -1,6 +1,6 @@
 import {join} from 'path'
-import { save_json,check_dir_create, exists, exists_public, file_ext } from './src/utils.js';
-import {get_images_info,get_codes_info,get_tables_info} from './src/md_utils.js'
+import { exists, exists_public, file_ext } from './src/utils.js';
+import {get_file_links_info,get_codes_info,get_tables_info} from './src/md_utils.js'
 import {parse_document,iterate_documents,
         set_config,parse_markdown} from './src/collect.js'
 import { debug, warn } from './src/libs/log.js';
@@ -42,7 +42,6 @@ async function collect(config){
     const documentIndex = Object.create(null)
     const blobManager = createBlobManager(runTimestamp)
 
-    await check_dir_create("ast")
     const originalCwd = process.cwd()
     try{
         process.chdir(config.contentdir)
@@ -57,13 +56,12 @@ async function collect(config){
             }
             debug(` parsing sid: ${entry.sid} path: ${entry.path}`)
             const {tree,content} = await parse_document(entry,{markdownText})
-            await save_json(tree,join("ast",`${entry.sid}.json`))
             const assetList = []
             if(modelAsset){
                 assetList.push(modelAsset)
             }
             assetList.push(
-                ...get_images_info(entry,content),
+                ...get_file_links_info(entry,content),
                 ...get_tables_info(entry,content),
                 ...get_codes_info(entry,content)
             )

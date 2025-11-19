@@ -277,15 +277,15 @@ async function extract_images(tree, headings,entry) {
    return images_list;
 }
 
-function get_images_info(entry,content){
-    const images = []
+function get_file_links_info(entry,content){
+    const file_links = []
     if(content.images.length > 0){
         for(const image of content.images){
             if(isExternalAssetUrl(image.url)){
                 continue
             }
             const path = resolveDocumentAssetPath(entry,image.url)
-            images.push({
+            file_links.push({
                 type:"file",
                 uid:image.uid,
                 sid:image.sid,
@@ -296,7 +296,7 @@ function get_images_info(entry,content){
             })
         }
     }
-    return images
+    return file_links
 }
 
 function extract_code(tree,headings,entry){
@@ -396,7 +396,7 @@ export{
     title_slug,
     node_text,
     extract_refs,
-    get_images_info,
+    get_file_links_info,
     get_tables_info,
     get_codes_info
 }
