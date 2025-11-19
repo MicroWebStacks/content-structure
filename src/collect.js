@@ -7,7 +7,6 @@ import { md_tree, title_slug, extract_headings,
 import matter from 'gray-matter';
 import { createHash } from 'crypto';
 import {warn, debug} from './libs/log.js'
-import {textListMatches} from './node-text-matches.js'
 
 let config = {
     rootdir: process.cwd(),
@@ -299,7 +298,6 @@ async function* iterate_documents(){
 }
 
 async function tree_content(markdown_text,entry_details){
-    const config = get_config()
     const {content, data} = matter(markdown_text)
     const tree = md_tree(content)
     const headings = extract_headings(tree,entry_details.uid)
@@ -307,9 +305,6 @@ async function tree_content(markdown_text,entry_details){
     const tables = extract_tables(tree,headings,entry_details)
     entry_details.tables = tables
     const images = await extract_images(tree,headings,entry_details)
-    for(const image of images){
-        image.references = textListMatches(image.text_list,config.matches)
-    }
     entry_details.images = images
     const code = extract_code(tree,headings,entry_details)
     entry_details.code = code

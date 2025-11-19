@@ -5,11 +5,10 @@ import {dirname, basename,parse, extname} from 'path'
 import {remark} from 'remark'
 import remarkDirective from 'remark-directive'
 import remarkGfm from 'remark-gfm';
-import {remarkMatches} from './node-text-matches.js'
 import {join} from 'path'
 import { exists } from './utils.js';
 import { JSDOM } from 'jsdom';
-import { get_config,shortMD5 } from './collect.js';
+import { shortMD5 } from './collect.js';
 import { debug, warn } from './libs/log.js';
 
 async function get_image_text(path){
@@ -149,8 +148,7 @@ function md_tree(content) {
         .use(remarkDirective)
         .use(remarkGfm)
     const markdownAST = processor.parse(content);
-    const new_markdownAST = remarkMatches(markdownAST,get_config().matches)
-    return new_markdownAST;
+    return markdownAST;
 }
 
 function extract_headings(tree,doc_uid){

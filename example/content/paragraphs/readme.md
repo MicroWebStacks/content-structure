@@ -19,8 +19,8 @@ an introduction to the table
 
 detailed description of the table `function()` with interleaved inlineCode
 
-Link to page::image
+See the [image entry](../image/readme.md) for more details.
 
-Link to page::image again
+Link to the [image entry](../image/readme.md) again
 
-Link to page::image again page::image  two times
+Link to the [image entry](../image/readme.md) again image entry two times

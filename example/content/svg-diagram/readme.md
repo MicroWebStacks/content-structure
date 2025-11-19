@@ -4,4 +4,4 @@ title: Diagram
 
 ![Diagram ref](./diagram-ref.svg)
 
-mentionning sid::d22fc345 as a team table
+highlighting the team table component that matches the data source

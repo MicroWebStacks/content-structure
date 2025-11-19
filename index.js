@@ -25,13 +25,6 @@ function cloneEntry(entry){
 
 async function collect(config){
 
-    //enforced matches for internal cross referencing
-    if(!Object.hasOwn(config,"matches")){
-        config.matches = {}
-    }
-    config.matches.page = 'page::([\\w-.]+)'
-    config.matches.sid = 'sid::([\\w-.]+)'
-
     set_config(config)
     const runDate = new Date()
     const runTimestamp = runDate.toISOString()
