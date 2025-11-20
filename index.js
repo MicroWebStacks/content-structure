@@ -43,7 +43,7 @@ async function collect(config){
     try{
         process.chdir(config.contentdir)
         for await (const source of iterate_documents()){
-            const {entry, markdownText, modelAsset} = source ?? {}
+            const {entry, markdownText} = source ?? {}
             if(!entry){
                 continue
             }
@@ -62,9 +62,6 @@ async function collect(config){
             const entryDetails = cloneEntry(entry)
             const {tree,content,assets:documentAssets} = await tree_content(markdownText,entryDetails)
             const assetList = []
-            if(modelAsset){
-                assetList.push(modelAsset)
-            }
             if(Array.isArray(documentAssets) && documentAssets.length > 0){
                 assetList.push(...documentAssets)
             }

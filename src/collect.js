@@ -1,6 +1,6 @@
 import {globStream} from 'glob'
 import { relative, resolve, join, sep, basename, dirname, parse, extname } from 'path';
-import { load_text,exists,exists_public } from './utils.js';
+import { load_text,exists,exists_public, load_yaml } from './utils.js';
 import { title_slug, buildDocumentContent } from './md_utils.js';
 import matter from 'gray-matter';
 import { createHash } from 'crypto';
@@ -171,14 +171,10 @@ async function createMarkdownDocumentSource(file_path){
         base_dir
     }
     applyEntryOverrides(entry, entryFields, knownEntryFields)
-    const modelAsset = createFrontmatterAsset(entry, modelFields)
-    if(modelAsset){
-        entry.model = modelAsset.uid
-    }
+    setEntryMetaData(entry, modelFields)
     return {
         entry,
-        markdownText:bodyContent ?? '',
-        modelAsset
+        markdownText:bodyContent ?? ''
     }
 }
 
@@ -212,6 +208,7 @@ async function* collectSingleFolderDocuments(){
         }
     }
     const sortedDirs = Array.from(buckets.keys()).sort()
+    const knownEntryFields = await getKnownEntryFieldSet()
     for(const dir of sortedDirs){
         const bucket = buckets.get(dir)
         if(!bucket || bucket.markdown.length === 0){
@@ -245,17 +242,14 @@ async function* collectSingleFolderDocuments(){
             slug,
             title,
             level,
-            base_dir,
-            model:null
+            base_dir
         }
-        const modelAsset = createFolderModelAsset(entry,bucket.models)
-        if(modelAsset){
-            entry.model = modelAsset.uid
-        }
+        const {entryFields: modelEntryFields, modelFields} = await loadModelMetaData(bucket.models, knownEntryFields)
+        applyEntryOverrides(entry, modelEntryFields, knownEntryFields)
+        setEntryMetaData(entry, modelFields)
         yield {
             entry,
-            markdownText,
-            modelAsset
+            markdownText
         }
     }
 }
@@ -268,38 +262,68 @@ function getDocumentBaseDir(file_path){
     return dir
 }
 
-function createFrontmatterAsset(entry, frontmatter){
-    const payload = frontmatter ?? {}
-    const keys = Object.keys(payload)
-    if(keys.length === 0){
-        return null
+function parseExistingMetaData(value){
+    if(typeof value !== 'string' || value.trim().length === 0){
+        return {}
     }
-    const uid = `${entry.uid}#frontmatter`
-    const asset = {
-        type:"model",
-        uid,
-        sid:shortMD5(uid),
-        document:entry.sid,
-        parent_doc_uid:entry.uid,
-        blob_content:JSON.stringify(payload)
+    try{
+        const parsed = JSON.parse(value)
+        if(parsed && typeof parsed === 'object' && !Array.isArray(parsed)){
+            return parsed
+        }
+    }catch(_error){
+        // ignore malformed JSON, fallback to empty object
     }
-    return asset
+    return {}
 }
 
-function createFolderModelAsset(entry, modelFiles = []){
-    if(!modelFiles || modelFiles.length === 0){
-        return null
+function sanitizeMetaFields(metaFields){
+    const result = {}
+    for(const [key,value] of Object.entries(metaFields ?? {})){
+        if(value === undefined){
+            continue
+        }
+        result[key] = value
+    }
+    return result
+}
+
+function setEntryMetaData(entry, metaFields){
+    if(!entry || !metaFields){
+        return
+    }
+    const sanitized = sanitizeMetaFields(metaFields)
+    const keys = Object.keys(sanitized)
+    if(keys.length === 0){
+        return
+    }
+    const existing = parseExistingMetaData(entry.meta_data)
+    const merged = {
+        ...existing,
+        ...sanitized
+    }
+    if(Object.keys(merged).length === 0){
+        delete entry.meta_data
+        return
+    }
+    entry.meta_data = JSON.stringify(merged)
+}
+
+async function loadModelMetaData(modelFiles = [], knownEntryFields){
+    if(!Array.isArray(modelFiles) || modelFiles.length === 0){
+        return {entryFields:{}, modelFields:{}}
     }
     const sorted = [...modelFiles].sort()
     const selected = sorted[0]
-    const uid = `${entry.uid}#${basename(selected)}`
-    return {
-        type:"model",
-        uid,
-        sid:shortMD5(uid),
-        document:entry.sid,
-        parent_doc_uid:entry.uid,
-        path:selected
+    try{
+        const payload = await load_yaml(selected)
+        if(!payload || typeof payload !== 'object'){
+            return {entryFields:{}, modelFields:{}}
+        }
+        return partitionFrontmatter(payload, knownEntryFields)
+    }catch(error){
+        warn(`(X) failed to load model file '${selected}': ${error.message}`)
+        return {entryFields:{}, modelFields:{}}
     }
 }
 
