@@ -37,7 +37,7 @@ async function collect(config){
     const documentIndex = Object.create(null)
     const blobManager = createBlobManager(runTimestamp)
     const blobState = createBlobState()
-    let documentOrder = 0
+    const orderTracker = createDocumentOrderTracker()
 
     const originalCwd = process.cwd()
     try{
@@ -47,10 +47,7 @@ async function collect(config){
             if(!entry){
                 continue
             }
-            documentOrder += 1
-            if(entry.order === undefined || entry.order === null){
-                entry.order = documentOrder
-            }
+            assignDocumentOrder(entry, orderTracker)
             if(entry.version_id === undefined || entry.version_id === null){
                 entry.version_id = versionId
             }
@@ -223,6 +220,69 @@ function registerBlob(blobState,data,timestamp){
     }
     catalog.set(data.hash,entry)
     return entry
+}
+
+function createDocumentOrderTracker(){
+    return new Map()
+}
+
+function assignDocumentOrder(entry, tracker){
+    if(!entry || !tracker){
+        return
+    }
+    const key = buildOrderGroupKey(entry)
+    let group = tracker.get(key)
+    if(!group){
+        group = {
+            taken:new Set(),
+            next:1
+        }
+        tracker.set(key,group)
+    }
+    const explicitOrder = normalizeOrderValue(entry.order)
+    if(explicitOrder !== null){
+        recordOrderValue(group, explicitOrder)
+        entry.order = explicitOrder
+        return
+    }
+    let candidate = group.next
+    while(group.taken.has(candidate)){
+        candidate += 1
+    }
+    recordOrderValue(group, candidate)
+    entry.order = candidate
+}
+
+function normalizeOrderValue(value){
+    if(value === null || value === undefined){
+        return null
+    }
+    const numberValue = Number(value)
+    if(!Number.isFinite(numberValue)){
+        return null
+    }
+    const normalized = Math.floor(numberValue)
+    if(normalized <= 0){
+        return null
+    }
+    return normalized
+}
+
+function recordOrderValue(group, value){
+    group.taken.add(value)
+    if(value === group.next){
+        while(group.taken.has(group.next)){
+            group.next += 1
+        }
+    }
+}
+
+function buildOrderGroupKey(entry){
+    const baseDir = typeof entry?.base_dir === 'string' && entry.base_dir.length > 0
+        ? entry.base_dir
+        : '.'
+    const level = Number.isFinite(entry?.level) ? entry.level : 0
+    return `${baseDir}|${level}`
 }
 
 

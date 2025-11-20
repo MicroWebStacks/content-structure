@@ -72,6 +72,9 @@ When `folder_single_doc` is enabled, every folder is treated as a single documen
 
 Metadata is therefore always collocated with the document row itself—no additional assets are created just to store free-form fields.
 
+### Ordering
+Documents also expose an `order` column. When you omit it, Content Structure assigns numbers per directory-and-level group using the alphabetical listing of siblings, ensuring menus can render in a predictable order. If you declare `order` in front matter or the folder YAML, those positions are reserved and any remaining siblings automatically fill the lowest available gaps.
+
 ### URL type
 Content structure allows both file and folder URL types to be used at the same time without the need of user configuration.  
 If a markdown file is named `readme.md` or matches the parent directory name, it is treated as a folder document (`url_type: "dir"`); any other filename is considered a file document.
