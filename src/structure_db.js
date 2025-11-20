@@ -593,11 +593,29 @@ function nodeContainsMatchingDescendant(node, predicate) {
 
 function serializeAstNode(node) {
     try {
-        return JSON.stringify(node);
+        const sanitized = sanitizeAstValue(node);
+        return JSON.stringify(sanitized);
     } catch (error) {
         warn(`(X) failed to serialize AST node: ${error.message}`);
         return null;
     }
+}
+
+function sanitizeAstValue(value) {
+    if (Array.isArray(value)) {
+        return value.map((entry) => sanitizeAstValue(entry));
+    }
+    if (value && typeof value === 'object') {
+        const result = {};
+        for (const [key, child] of Object.entries(value)) {
+            if (key === 'position') {
+                continue;
+            }
+            result[key] = sanitizeAstValue(child);
+        }
+        return result;
+    }
+    return value;
 }
 
 function formatItemUid(docSid, orderIndex) {
