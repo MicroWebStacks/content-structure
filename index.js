@@ -37,7 +37,7 @@ async function collect(config){
     const assetIndex = Object.create(null)
     const documentIndex = Object.create(null)
     const blobManager = createBlobManager(runTimestamp)
-    const blobCatalog = new Map()
+    const blobState = createBlobState()
 
     const originalCwd = process.cwd()
     try{
@@ -66,15 +66,15 @@ async function collect(config){
 
             await annotateAssets(assetList,config)
             stampAssets(assetList, runTimestamp)
-            await attachBlobsToAssets(assetList, blobManager, blobCatalog, runTimestamp)
+            await attachBlobsToAssets(assetList, blobManager, blobState, runTimestamp)
             writer.insertDocument(entry,content,tree,assetList)
             if(assetList.length > 0){
                 writer.insertAssets(assetList)
                 addAssetsToIndex(assetIndex,assetList)
             }
         }
-        if(blobCatalog.size > 0){
-            writer.insertBlobs(Array.from(blobCatalog.values()))
+        if(blobState.catalog.size > 0){
+            writer.insertBlobs(Array.from(blobState.catalog.values()))
         }
     }finally{
         process.chdir(originalCwd)
@@ -134,24 +134,26 @@ function stampAssets(assets,timestamp){
     }
 }
 
-async function attachBlobsToAssets(assets,blobManager,blobCatalog = new Map(),timestamp){
-    if(!blobManager){
+async function attachBlobsToAssets(assets,blobManager,blobState,timestamp){
+    if(!blobManager || !blobState){
         return
     }
     for(const asset of assets){
-        if(!asset || asset.blob_hash){
+        if(!asset || asset.blob_uid){
             continue
         }
         if(typeof asset.blob_content === 'string'){
             const buffer = Buffer.from(asset.blob_content,'utf8')
             const result = await blobManager.ensureFromBuffer(buffer)
             if(result){
-                asset.blob_hash = result.hash
-                recordBlobMetadata(blobCatalog,{
+                const blobEntry = registerBlob(blobState,{
                     hash:result.hash,
                     size:result.size ?? buffer.length,
                     path:result.path ?? null
                 },timestamp)
+                if(blobEntry){
+                    asset.blob_uid = blobEntry.blob_uid
+                }
             }
             continue
         }
@@ -159,12 +161,14 @@ async function attachBlobsToAssets(assets,blobManager,blobCatalog = new Map(),ti
             try{
                 const result = await blobManager.ensureFromFile(asset.abs_path)
                 if(result){
-                    asset.blob_hash = result.hash
-                    recordBlobMetadata(blobCatalog,{
+                    const blobEntry = registerBlob(blobState,{
                         hash:result.hash,
                         size:result.size ?? null,
                         path:result.path ?? null
                     },timestamp)
+                    if(blobEntry){
+                        asset.blob_uid = blobEntry.blob_uid
+                    }
                 }
             }catch(error){
                 warn(`(X) failed to create blob for '${asset.path}': ${error.message}`)
@@ -173,24 +177,40 @@ async function attachBlobsToAssets(assets,blobManager,blobCatalog = new Map(),ti
     }
 }
 
-function recordBlobMetadata(blobCatalog,data,timestamp){
-    if(!data || !data.hash){
-        return
+function createBlobState(){
+    return {
+        catalog:new Map(),
+        counter:0
     }
-    const existing = blobCatalog.get(data.hash) ?? {hash:data.hash}
+}
+
+function registerBlob(blobState,data,timestamp){
+    if(!blobState || !data || !data.hash){
+        return null
+    }
+    const {catalog} = blobState
+    let entry = catalog.get(data.hash)
+    if(!entry){
+        blobState.counter += 1
+        entry = {
+            blob_uid: blobState.counter.toString(16),
+            hash:data.hash
+        }
+    }
     if(Number.isFinite(data.size)){
-        existing.size = data.size
+        entry.size = data.size
     }
     if(data.path){
-        existing.path = data.path
+        entry.path = data.path
     }
     if(timestamp){
-        if(!existing.first_seen){
-            existing.first_seen = timestamp
+        if(!entry.first_seen){
+            entry.first_seen = timestamp
         }
-        existing.last_seen = timestamp
+        entry.last_seen = timestamp
     }
-    blobCatalog.set(data.hash,existing)
+    catalog.set(data.hash,entry)
+    return entry
 }
 
 

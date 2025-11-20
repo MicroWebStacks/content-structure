@@ -300,27 +300,20 @@ function buildItemRows(doc, content, options = {}) {
                 asset_uid: asset.uid,
                 version_id: versionId,
                 doc_sid: doc.sid,
-                blob_hash: asset.blob_hash ?? null,
+                blob_uid: asset.blob_uid ?? null,
                 role: role ?? null
             });
         }
         return asset;
     }
 
-    function createAssetLink(assetUid, role, labelText) {
+    function createAssetLink(assetUid, role) {
         const asset = recordAssetVersion(assetUid, role);
         if (!asset) {
             return null;
         }
-        const normalizedLabel = formatAssetLabel(labelText, asset.uid);
         const schemeType = formatAssetType(asset.type);
-        return `![${normalizedLabel}](asset://${schemeType}/${asset.uid})`;
-    }
-
-    function formatAssetLabel(labelText, fallback) {
-        const raw = typeof labelText === 'string' ? labelText.trim() : '';
-        const base = raw || fallback || 'asset';
-        return base.replace(/[\[\]]/g, '');
+        return `![${schemeType}](asset:///${asset.uid})`;
     }
 
     function formatAssetType(type) {
@@ -406,7 +399,7 @@ function buildItemRows(doc, content, options = {}) {
         const level = getLevelForLine(line);
         const descriptionValue = tableEntry.text ?? tableEntry.id ?? 'table';
         const description = String(descriptionValue).trim();
-        const assetLink = createAssetLink(tableEntry.uid, 'table_data', description);
+        const assetLink = createAssetLink(tableEntry.uid, 'table_data');
         const text = assetLink ?? (description || 'table');
         pushRow({
             type: 'table',
@@ -421,7 +414,7 @@ function buildItemRows(doc, content, options = {}) {
         const level = getLevelForLine(line);
         const language = codeEntry.language ?? node.lang ?? 'code';
         const label = `code(${language})`;
-        const assetLink = createAssetLink(codeEntry.uid, 'code_block', label);
+        const assetLink = createAssetLink(codeEntry.uid, 'code_block');
         const text = assetLink ?? label;
         pushRow({
             type: 'code',
@@ -442,7 +435,7 @@ function buildItemRows(doc, content, options = {}) {
             labelParts.push(String(imageEntry.alt));
         }
         const label = labelParts.join(' ').trim() || 'image';
-        const assetLink = createAssetLink(imageEntry.uid, 'inline_image', label);
+        const assetLink = createAssetLink(imageEntry.uid, 'inline_image');
         const text = assetLink ?? label;
         pushRow({
             type: 'image',
@@ -535,7 +528,7 @@ function persistAssets(db, assets, assetsSchema, options) {
     const rows = assets.map((asset) => ({
         uid: asset.uid,
         type: asset.type ?? null,
-        blob_hash: asset.blob_hash ?? null,
+        blob_uid: asset.blob_uid ?? null,
         parent_doc_uid: asset.parent_doc_uid ?? null,
         path: asset.path ?? null,
         ext: asset.ext ?? null,
@@ -550,7 +543,8 @@ function persistBlobs(db, blobs, blobsSchema, options) {
         return;
     }
     const rows = blobs.map((blob) => ({
-        hash: blob.hash,
+        blob_uid: blob.blob_uid ?? null,
+        hash: blob.hash ?? null,
         size: blob.size ?? null,
         path: blob.path ?? null,
         first_seen: blob.first_seen ?? null,

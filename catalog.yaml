@@ -37,14 +37,14 @@ datasets:
           - { name: asset_uid, type: string, primary: true, description: UID of the referenced asset as stored in the assets table }
           - { name: version_id, type: string, description: Encoded seconds-since-2000 identifier for the collection run }
           - { name: doc_sid, type: string, description: SID of the document that owns the item }
-          - { name: blob_hash, type: string, description: SHA-512 hash of the referenced blob }
+          - { name: blob_uid, type: string, description: UID of the blob row referenced by this asset }
           - { name: role, type: string, description: Role of the asset within the item such as inline_image, table_data, or code_block }
       - name: assets
         description: Asset catalog linking documents to their concrete payloads via blob hashes derived from code blocks, tables, image references, models, and loose files.
         columns:
           - { name: uid, type: string, primary: true, description: Stable identifier composed from the document uid and asset slug }
           - { name: type, type: string, values: [file, codeblock, table, model], description: Asset type such as codeblock, table, file, or model }
-          - { name: blob_hash, type: string, description: SHA-512 hash identifying the stored blob payload }
+          - { name: blob_uid, type: string, description: UID joining to the blobs table entry }
           - { name: parent_doc_uid, type: string, description: UID of the document that introduced the asset }
           - { name: path, type: string, description: Source-relative path for file-backed assets }
           - { name: ext, type: string, description: File extension for referenced files when available }
@@ -53,7 +53,8 @@ datasets:
       - name: blobs
         description: Unique blob payloads materialized on disk and shared across assets via their SHA-512 hash.
         columns:
-          - { name: hash, type: string, primary: true, description: SHA-512 hash identifying the blob }
+          - { name: blob_uid, type: string, primary: true, description: Monotonic hex identifier for the blob row }
+          - { name: hash, type: string, description: SHA-512 hash identifying the blob }
           - { name: size, type: int, description: Size of the stored blob in bytes }
           - { name: path, type: string, description: Relative path including the blobs/year/month/prefix layout }
           - { name: first_seen, type: string, description: ISO timestamp when the blob was first observed }
