@@ -9,8 +9,7 @@ await collect({
     rootdir:rootdir,
     contentdir:join(rootdir,"content"),
     file_link_ext:["svg","webp","png","jpeg","jpg","xlsx","glb"],
-    outdir:join(rootdir,".structure"),
-    debug:false
+    outdir:join(rootdir,".structure")
 })
 
 const dbPath = join(rootdir,".structure","structure.db");

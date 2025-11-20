@@ -1,11 +1,10 @@
 # Content Structure
-content-structure collects all your markdown files meta data and parses the Abstract Syntax Tree of each file
+Parsed markdown is stored in SQLite tables that can be used for rendering and database content management.
+
+![design](design.drawio.svg)
 
 ## Deepwiki
 https://deepwiki.com/MicroWebStacks/content-structure
-
-## Concept
-![design](design.drawio.svg)
 
 # install
 prerequisites
@@ -23,74 +22,55 @@ collect all data by running this once
 ```javascript
 import {collect} from 'content-structure'
 
-await collect()
+await collect({
+    rootdir:rootdir,
+    contentdir:join(rootdir,"content"),
+    file_link_ext:["svg","webp","png","jpeg","jpg","xlsx","glb"],
+    outdir:join(rootdir,".structure")
+})
 ```
-then use as follows
-```javascript
-import {getDocuments, getEntry} from 'content-structure'
+see demo with
+```cmd
+>pnpm run demo
+> node parse.js
 
-const documents = await getDocuments()
-console.log(`obtained ${documents.length} documents`)
-
-const image_entry = await getEntry({slug:"image"})
-const images_urls = image_entry.data.images.map(image=>image.url)
-console.log(`'image' content entry has following images '${images_urls}'`)
-console.log(`image meta data payload '${image_entry.meta_data ?? 'none'}'`)
-
-```
-will output
-```shell
-obtained 14 documents
-'image' content entry has following images './tree.svg,./long-diagram.svg'
-image meta data payload '{"hero":"Dendrogram"}'
+content_dir : C:\dev\MicroWebStacks\content-structure\example\content
+   searching for files with extensions : *.md
+Structure DB tables and row counts:
+  - asset_info: 19
+  - assets: 19
+  - blob_store: 14
+  - documents: 30
+  - items: 82
 ```
 
-# Roadmap
-- [x] provide an API for querying documents content-by-x
-- [x] extracting svg text and span content with jsdom
-- [x] replace refs with a reference node
-- [x] test hierarchical content
-- [ ] files with same name as folder count as folder type
-- [ ] test combined content e.g. code inside table, image inside table
-- [ ] provide an API for querying image-by-x, table-by-x,...
-- [ ] helper for search engine injection
-- [ ] check compatibility with content-collections
-- [ ] add optional typecheck
-
-## ideas
-* parse other images types for text extraction
 
 # Documentation
-## Documents fields description
-### Metadata
-Documents expose a `meta_data` column that stores the JSON representation of any metadata fields not mapped directly to schema columns.  
-In multi-document mode (default) markdown front matter is split into known schema fields (e.g., `title`, `slug`, `tags`, etc.) and leftover fields. The leftovers are serialized to JSON and stored in `meta_data`.  
-When `folder_single_doc` is enabled, every folder is treated as a single document:
+Content Structure produces a relational snapshot of every markdown run using the schema declared in [`catalog.yaml`](./catalog.yaml).  
+The catalog defines a single `structure` dataset whose tables are optimized for rendering, search indexing, and asset management. Each run populates these tables under `.structure/structure.db`.
 
-1. All markdown files inside the folder are concatenated alphabetically and parsed as one document. Front matter is ignored.
-2. The first YAML/YML file inside the same folder is parsed, its known fields override document columns, and any extra keys are serialized into `meta_data`.
+### Table overview
+| Table | Purpose | Relationships |
+| --- | --- | --- |
+| `documents` | Canonical row per markdown entry. Stores stable ids, routing metadata, and leftover front matter via the `meta_data` JSON column. | `items`, `assets`, and `asset_info` reference `documents.sid`. |
+| `items` | Flattened AST stream in reading order. Each row keeps `body_text` for simple rendering plus an optional serialized AST subtree for nested constructs (stored in `ast`). | References `documents` via `doc_sid`; `assets` rows connect items to blobs when an AST node produces a file. |
+| `assets` | Run-specific join table so consumers can tell which document referenced which asset at a given `version_id`. | Bridge between `documents` and `asset_info`; also carries the `blob_uid` for quick payload lookups. |
+| `asset_info` | Deduplicated description of every asset (code blocks, tables, linked files, etc.) regardless of run. | Points to the owning document (`parent_doc_uid`) and the physical payload via `blob_uid`. |
+| `blob_store` | Source of truth for payloads. Large blobs are stored under `blobs/YYYY/MM/ff/hash` and referenced by path, while small blobs inline their bytes (compressed when eligible). | `asset_info`/`assets` link to blobs through `blob_uid`. |
 
-Metadata is therefore always collocated with the document row itself—no additional assets are created just to store free-form fields.
+The catalog is intentionally compact: fields are named to match DOM concerns (`slug`, `url_type`, `level`), content analysis (`headings`, `links`, `code`), and asset lifecycle (`first_seen`, `last_seen`). Instead of memorizing every column, browse [`catalog.yaml`](./catalog.yaml) whenever you need the exact types or to extend the dataset. Downstream tools can rely on the catalog as the authoritative contract when generating queries, migrations, or analytics dashboards.
 
-### Ordering
-Documents also expose an `order` column. When you omit it, Content Structure assigns numbers per directory-and-level group using the alphabetical listing of siblings, ensuring menus can render in a predictable order. If you declare `order` in front matter or the folder YAML, those positions are reserved and any remaining siblings automatically fill the lowest available gaps.
+### Document behavior highlights
+- **Metadata folding** – Any front matter not mapped to a declared column is serialized into `documents.meta_data`, keeping schemas manageable without losing context.
+- **Automatic ordering** – Documents inherit incremental `order` values scoped to their directory level unless you pin them explicitly. This keeps navigation menus stable even when markdown files are added later.
+- **Mixed routing** – Folder-style (`readme.md` or matching filenames) and file-style URLs coexist. `url_type` reveals which variant was used to generate the url.
 
-### URL type
-Content structure allows both file and folder URL types to be used at the same time without the need of user configuration.  
-If a markdown file is named `readme.md` or matches the parent directory name, it is treated as a folder document (`url_type: "dir"`); any other filename is considered a file document.
+### Item and asset lifecycle
+- Paragraphs, headings, tables, code blocks, and images are all represented in `items`. Simple rows expose fully extracted text; nested structures store their sanitized AST so you can re-render bold or embedded assets without reparsing the original markdown.
+- Every asset mentioned by an item produces two entries: a durable definition in `asset_info` and a run-scoped membership row in `assets`. The membership row ties the asset to both the document and its blob so you can know exactly when something was added, removed, or reused.
+- Blob payloads avoid bloat with configurable thresholds: large files stream to disk under `blobs/`, while smaller text blobs can be compressed inline and served straight from SQLite.
 
-The field `url_type` will also be exposed for the user as in the example entry below
-```json
-  {
-    "sid": "a518c9b7",
-    "uid": "authors.agatha-christie",
-    "path": "authors/agatha-christie/entry.yml",
-    "url_type": "dir",
-    "slug": "agatha-christie",
-    "meta_data": "{\"featured\":true}"
-    ...
-  }
-```
+Refer back to the catalog for exhaustive field notes, and treat the tables above as the primary contract between your markdown source and any rendering or analytics layers.
 
 ## Config parameters
 the config parameter is optional and do have default values
@@ -102,135 +82,6 @@ the config parameter is optional and do have default values
 * `file_compress_ext` : defaults to `["txt","md","json","csv","tsv","yaml","yml"]`. Inline blobs are compressed only if their source extension (when known) appears in this list.
 
 ## Generated output
-* `gen/document_list.json`
-    * documents : a list of documents properties
-        * slug : auto generated if not provided
-        * uid : autogenerated and unique across all documents
-        * sid : a short uid with first 8 letters of the md5 hash, for simplified referencing e.g. in data directories or links
-        * meta_data : JSON string of any remaining frontmatter/YAML fields that do not match schema columns
-    * images : a list of images properties. These images were parsed from the markdown text content and not from the filesystem
-        * heading : the heading id of the section the image belongs to
-        * title : from the image link meta data
-        * document : the document the image was referenced in
-* each markdown file gets a `./gen/documents/<sid>` directors with
-    * `tree.json` the raw output of the remark AST parser
-    * content.json with the parameters and parsed content parameters
-* `.structure/structure.db` : a SQLite database (powered by better-sqlite3) that mirrors the JSON output.  
-  The database exposes the tables `documents`, `items`, `assets`, `asset_info`, and `blob_store`. Each `documents` row now includes the `version_id` of the run that produced it, plus an optional `meta_data` JSON string whenever leftover metadata fields are detected.  
-  Repeating values are normalised into dedicated tables, while any retained list uses a `*_list` column that stores a JSON string of the related ids.  
-  Items flatten the AST of every markdown document using a stable `version_id` per run and now embed inline asset references directly as `asset://type/asset_uid` Markdown tokens. Complex items with nested formatting retain their AST subtree as a JSON string in the optional `ast` column so recursive rendering data is not lost.  
-  `assets` rows keep per-run joins between assets and documents without placeholder ids, `asset_info` rows store the asset catalog metadata, and `blob_store` rows capture the blob hash, byte size, storage directory (when persisted to disk), inline payloads for small blobs, and a compression flag (`true`/`false` or `null` when the payload lives on disk).
-
-## Example generated output
-
-this files structure
-```shell
-└───content
-    ├───title-complex
-    │       readme.md
-    ├───text-simple
-    │       readme.md
-    ...
-```
-generates this output
-```shell
-└─gen
-  │   document_list.json
-  └───documents
-      ├───35298154
-      │       content.json
-      │       tree.json
-      ├───12b0e722
-      │       content.json
-      │       tree.json
-      ...
-```
-* `document_list.json` is the documents index
-```json
-[
-  {
-    "sid": "35298154",
-    "uid": "title-complex",
-    "path": "title-complex/readme.md",
-    "url_type": "dir",
-    "slug": "title-complex",
-    "title": "title Complex",
-    "meta_data": "{\"hero\":\"title\"}"
-  },
-  {
-    "sid": "12b0e722",
-    "uid": "text-simple",
-    "path": "text-simple/readme.md",
-    "url_type": "dir",
-    "slug": "text-simple",
-    "title": "Text Simple",
-    "meta_data": null
-  },
-  ...
-```
-* file content example
-```markdown
----
-title: Image
----
-![Tree](./tree.svg)
-
-```
-example of generated files for `image/readme.md` which has an sid of `78805a22`
-```json
-{
-  "sid": "78805a22",
-  "uid": "image",
-  "path": "image/readme.md",
-  "url_type": "dir",
-  "slug": "image",
-  "title": "Image",
-  "meta_data": "{\"hero\":\"Image\"}",
-  "headings": [],
-  "tables": [],
-  "images": [
-    {
-      "id": "tree",
-      "heading": null,
-      "title": null,
-      "url": "./tree.svg",
-      "alt": "Tree",
-      "label": ""
-    }
-  ],
-  "code": [],
-  "paragraphs": [
-    {
-      "heading": null,
-      "label": []
-    },
-    {
-      "heading": null,
-      "label": []
-    }
-  ]
-}
-```
-
-and the beginning of `tree.json`
-
-```json
-{
-  "type": "root",
-  "children": [
-    {
-      "type": "paragraph",
-      "children": [
-        {
-          "type": "image",
-          "title": null,
-          "url": "./tree.svg",
-          "alt": "Tree",
-          "position": {
-            "start": {
-              "line": 1,
-              "column": 1,
-              "offset": 0
-            },
-...
-```
+* `.structure/structure.db` : a SQLite database (powered by better-sqlite3).
+  The database exposes the tables `documents`, `items`, `assets`, `asset_info`, and `blob_store`.
+* `blobs/year/month/prefix/hash` path for all files larger than `config.external_storage_kb`

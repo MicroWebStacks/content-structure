@@ -23,7 +23,6 @@ datasets:
       - name: items
         description: Flattened AST items representing headings, paragraphs, and asset-backed nodes in reading order.
         columns:
-          - { name: uid, type: string, primary: true, description: Unique item identifier scoped by document and version }
           - { name: version_id, type: string, description: Encoded seconds-since-2000 identifier for the collection run }
           - { name: doc_sid, type: string, description: SID of the parent document }
           - { name: type, type: string, description: Item type such as heading, paragraph, table, code, or image }

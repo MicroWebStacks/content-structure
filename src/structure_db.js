@@ -278,10 +278,8 @@ function buildItemRows(doc, content, options = {}) {
     function pushRow({type, text, level, node}) {
         const sanitizedText = typeof text === 'string' ? text : '';
         const itemOrder = orderIndex;
-        const itemUid = formatItemUid(doc.sid, itemOrder);
         const astPayload = serializeAstIfNeeded(node, type);
         rows.push({
-            uid: itemUid,
             version_id: versionId,
             doc_sid: doc.sid,
             type,
@@ -616,11 +614,6 @@ function sanitizeAstValue(value) {
         return result;
     }
     return value;
-}
-
-function formatItemUid(docSid, orderIndex) {
-    const orderStr = String(orderIndex + 1).padStart(4, '0');
-    return `${docSid}-I${orderStr}`;
 }
 
 function getNodeLine(node) {
