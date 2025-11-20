@@ -1,6 +1,6 @@
 import { join } from 'path';
 import { check_dir_create, load_yaml_code } from './utils.js';
-import { get_config } from './collect.js';
+import { get_config, shortMD5 } from './collect.js';
 import { warn } from './libs/log.js';
 import { openDatabase, ensureTable, clearTable, insertRows, runInTransaction, ensureColumn } from './sqlite_utils/index.js';
 import { computeVersionId } from './version_id.js';
@@ -253,6 +253,7 @@ function buildItemRows(doc, content, options = {}) {
     const tables = Array.isArray(content?.tables) ? content.tables : [];
     const images = Array.isArray(content?.images) ? content.images : [];
     const codeBlocks = Array.isArray(content?.code) ? content.code : [];
+    const links = Array.isArray(content?.links) ? content.links : [];
     const assets = Array.isArray(options?.assets) ? options.assets : [];
     const assetMap = new Map();
     for (const asset of assets) {
@@ -268,6 +269,7 @@ function buildItemRows(doc, content, options = {}) {
     let tableCursor = 0;
     let imageCursor = 0;
     let codeCursor = 0;
+    let linkCursor = 0;
 
     function pushRow({type, text, level}) {
         const sanitizedText = typeof text === 'string' ? text : '';
@@ -343,6 +345,9 @@ function buildItemRows(doc, content, options = {}) {
             case 'image':
                 handleImage(node);
                 return;
+            case 'link':
+                handleLink(node);
+                return;
             default:
                 if (Array.isArray(node.children)) {
                     node.children.forEach(processNode);
@@ -389,6 +394,21 @@ function buildItemRows(doc, content, options = {}) {
             }
             if (segment.type === 'image') {
                 handleImage(segment.node, level, line);
+                return;
+            }
+            if (segment.type === 'link') {
+                const handled = handleLink(segment.node, level, line);
+                if (!handled) {
+                    const text = node_text(segment.node) ?? '';
+                    if (text && text.trim()) {
+                        pushRow({
+                            type: 'paragraph',
+                            text,
+                            level
+                        });
+                    }
+                }
+                return;
             }
         });
     }
@@ -444,6 +464,32 @@ function buildItemRows(doc, content, options = {}) {
         });
     }
 
+    function handleLink(node, levelOverride, lineOverride) {
+        const linkEntry = links[linkCursor++] ?? null;
+        const line = lineOverride ?? getNodeLine(node);
+        const level = typeof levelOverride === 'number' ? levelOverride : getLevelForLine(line);
+        const assetUid = resolveLinkAssetUid(doc, linkEntry, node);
+        const assetLink = assetUid ? createAssetLink(assetUid, 'linked_file') : null;
+        if (assetLink) {
+            pushRow({
+                type: 'link',
+                text: assetLink,
+                level
+            });
+            return true;
+        }
+        const label = formatLinkLabel(linkEntry, node);
+        if (label) {
+            pushRow({
+                type: 'paragraph',
+                text: label,
+                level
+            });
+            return true;
+        }
+        return false;
+    }
+
     function splitParagraphSegments(node) {
         if (!Array.isArray(node.children) || node.children.length === 0) {
             return [];
@@ -462,9 +508,9 @@ function buildItemRows(doc, content, options = {}) {
             }
         }
         for (const child of node.children) {
-            if (child.type === 'image') {
+            if (child.type === 'image' || child.type === 'link') {
                 flushBuffer();
-                segments.push({type: 'image', node: child});
+                segments.push({type: child.type, node: child});
             } else {
                 buffer.push(child);
             }
@@ -482,6 +528,15 @@ function buildItemRows(doc, content, options = {}) {
     }
 
     tree.children.forEach(processNode);
+
+    // Ensure document-level assets (e.g. frontmatter models) still receive a
+    // version record even when they are not tied to an AST node.
+    for (const asset of assets) {
+        if (!asset?.uid) {
+            continue;
+        }
+        recordAssetVersion(asset.uid, asset.type ?? null);
+    }
     return {rows, assetVersions};
 }
 
@@ -551,6 +606,42 @@ function persistBlobs(db, blobs, blobsSchema, options) {
         last_seen: blob.last_seen ?? null
     }));
     insertRows(db, 'blobs', blobsSchema.insertColumns, rows, options);
+}
+
+function resolveLinkAssetUid(doc, linkEntry, node) {
+    if (!doc?.uid) {
+        return null;
+    }
+    if (linkEntry?.id) {
+        return `${doc.uid}#link-${linkEntry.id}`;
+    }
+    const hashId = buildLinkHashId(node);
+    if (!hashId) {
+        return null;
+    }
+    return `${doc.uid}#${hashId}`;
+}
+
+function buildLinkHashId(node) {
+    const raw = node?.url;
+    if (typeof raw !== 'string' || raw.trim().length === 0) {
+        return null;
+    }
+    return `link-${shortMD5(raw)}`;
+}
+
+function formatLinkLabel(linkEntry, node) {
+    const text = typeof linkEntry?.text === 'string' ? linkEntry.text.trim() : '';
+    if (text) {
+        return text;
+    }
+    const title = typeof linkEntry?.title === 'string' ? linkEntry.title.trim() : '';
+    if (title) {
+        return title;
+    }
+    const fallback = node_text(node) ?? '';
+    const trimmed = fallback.trim();
+    return trimmed.length ? trimmed : null;
 }
 
 function serializeList(list) {
