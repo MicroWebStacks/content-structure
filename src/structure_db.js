@@ -80,6 +80,8 @@ function mapColumnTypeToSqlite(type) {
         case 'int':
         case 'boolean':
             return 'INTEGER';
+        case 'blob':
+            return 'BLOB';
         default:
             return 'TEXT';
     }
@@ -602,6 +604,8 @@ function persistBlobStore(db, blobs, blobsSchema, options) {
         hash: blob.hash ?? null,
         size: blob.size ?? null,
         path: blob.path ?? null,
+        payload: blob.payload ?? null,
+        compression: normalizeScalar(blob.compression),
         first_seen: blob.first_seen ?? null,
         last_seen: blob.last_seen ?? null
     }));

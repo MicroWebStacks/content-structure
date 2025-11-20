@@ -97,6 +97,8 @@ the config parameter is optional and do have default values
 * `rootdir` : defaults to current working directory. The path where to find the a `content` directory.
 * `outdir` : defaults to `.structure`. Relative output directory is the location where all output data will be generated, which is relative to the root directory.
 * `folder_single_doc` : defaults to `false`. When `true`, each folder is treated as a single document and the first YAML/YML file contributes overrides plus `meta_data` fields.
+* `blob_external_threshold_bytes` : defaults to `1_048_576` (1 MB). Blobs larger than this size are written to disk under `blobs/<YYYY>/<MM>/<prefix>/<hash>`.
+* `blob_inline_compression_min_bytes` : defaults to `4_096`. Inline blobs bigger than or equal to this size are gzip-compressed before being stored inside the `blob_store` table.
 
 ## Generated output
 * `gen/document_list.json`
@@ -116,7 +118,7 @@ the config parameter is optional and do have default values
   The database exposes the tables `documents`, `items`, `assets`, `asset_info`, and `blob_store`. Each `documents` row now includes the `version_id` of the run that produced it, plus an optional `meta_data` JSON string whenever leftover metadata fields are detected.  
   Repeating values are normalised into dedicated tables, while any retained list uses a `*_list` column that stores a JSON string of the related ids.  
   Items flatten the AST of every markdown document using a stable `version_id` per run and now embed inline asset references directly as `asset://type/asset_uid` Markdown tokens.  
-  `assets` rows keep per-run joins between assets and documents without placeholder ids, `asset_info` rows store the asset catalog metadata, and `blob_store` rows capture the blob hash, byte size, and storage directory (built from the year/month/prefix layout) next to their existing metadata.
+  `assets` rows keep per-run joins between assets and documents without placeholder ids, `asset_info` rows store the asset catalog metadata, and `blob_store` rows capture the blob hash, byte size, storage directory (when persisted to disk), inline payloads for small blobs, and a compression flag (`true`/`false` or `null` when the payload lives on disk).
 
 ## Example generated output
 

@@ -1,8 +1,14 @@
 import { createHash } from 'crypto';
 import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
+import { gzip } from 'zlib';
+import { promisify } from 'util';
 import { check_dir_create, exists_abs } from './utils.js';
 import { get_config } from './collect.js';
+
+const gzipAsync = promisify(gzip);
+const DEFAULT_EXTERNAL_THRESHOLD_BYTES = 1024 * 1024; // 1MB
+const DEFAULT_INLINE_COMPRESSION_MIN_BYTES = 4 * 1024; // 4KB
 
 function formatMonth(month) {
     return String(month).padStart(2, '0');
@@ -34,7 +40,16 @@ function deriveStorageDir(relativePath) {
 class BlobManager {
     constructor(timestamp) {
         this.timestamp = timestamp ?? new Date().toISOString();
-        this.hashIndex = new Map(); // hash -> {relativePath, storageDir, size}
+        const config = get_config();
+        this.externalThreshold = normalizeThreshold(
+            config?.blob_external_threshold_bytes,
+            DEFAULT_EXTERNAL_THRESHOLD_BYTES
+        );
+        this.inlineCompressionMin = normalizeThreshold(
+            config?.blob_inline_compression_min_bytes,
+            DEFAULT_INLINE_COMPRESSION_MIN_BYTES
+        );
+        this.hashIndex = new Map(); // hash -> {relativePath, storageDir, size, payload, compression}
     }
 
     async ensureFromBuffer(buffer) {
@@ -44,23 +59,11 @@ class BlobManager {
         const hash = createHash('sha512').update(buffer).digest('hex');
         const existing = this.hashIndex.get(hash);
         if (!existing) {
-            const {year, month} = getDateParts(this.timestamp);
-            const prefix = hash.slice(0, 2);
-            const storageDir = [String(year), formatMonth(month), prefix].join('/');
-            const relDir = ['blobs', storageDir].join('/');
-            await check_dir_create(relDir);
-            const relativePath = `${relDir}/${hash}`;
-            await this.writeBlob(relativePath, buffer);
-            const entry = {
-                relativePath,
-                storageDir,
-                size: buffer.length
-            };
+            const entry = await this.persistBuffer(buffer, hash);
             this.hashIndex.set(hash, entry);
-            return {hash, size: entry.size, path: entry.storageDir};
+            return buildResult(hash, entry);
         }
-        const storageDir = existing.storageDir ?? deriveStorageDir(existing.relativePath);
-        return {hash, size: existing.size, path: storageDir};
+        return buildResult(hash, existing);
     }
 
     async ensureFromFile(absPath) {
@@ -80,6 +83,71 @@ class BlobManager {
         }
         await writeFile(absPath, buffer);
     }
+
+    async persistBuffer(buffer, hash) {
+        const size = buffer.length;
+        if (size > this.externalThreshold) {
+            const {year, month} = getDateParts(this.timestamp);
+            const prefix = hash.slice(0, 2);
+            const storageDir = [String(year), formatMonth(month), prefix].join('/');
+            const relDir = ['blobs', storageDir].join('/');
+            await check_dir_create(relDir);
+            const relativePath = `${relDir}/${hash}`;
+            await this.writeBlob(relativePath, buffer);
+            return {
+                relativePath,
+                storageDir,
+                size,
+                payload: null,
+                compression: null
+            };
+        }
+        const inlinePayload = await this.prepareInlinePayload(buffer);
+        return {
+            relativePath: null,
+            storageDir: null,
+            size,
+            payload: inlinePayload.payload,
+            compression: inlinePayload.compression
+        };
+    }
+
+    async prepareInlinePayload(buffer) {
+        const shouldCompress = buffer.length >= this.inlineCompressionMin;
+        if (!shouldCompress) {
+            return {
+                payload: Buffer.from(buffer),
+                compression: false
+            };
+        }
+        const compressed = await gzipAsync(buffer);
+        return {
+            payload: compressed,
+            compression: true
+        };
+    }
+}
+
+function normalizeThreshold(value, fallback) {
+    if (value === null || value === undefined) {
+        return fallback;
+    }
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+        return fallback;
+    }
+    return numeric;
+}
+
+function buildResult(hash, entry) {
+    const storageDir = entry.storageDir ?? deriveStorageDir(entry.relativePath);
+    return {
+        hash,
+        size: entry.size,
+        path: storageDir ?? null,
+        payload: entry.payload ?? null,
+        compression: entry.compression ?? null
+    };
 }
 
 function createBlobManager(timestamp) {

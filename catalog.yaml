@@ -54,7 +54,9 @@ datasets:
         columns:
           - { name: blob_uid, type: string, primary: true, description: Monotonic hex identifier for the blob row }
           - { name: hash, type: string, description: SHA-512 hash identifying the blob }
-          - { name: size, type: int, description: Size of the stored blob in bytes }
           - { name: path, type: string, description: Directory path within the blob store hierarchy such as YYYY/MM/ff }
           - { name: first_seen, type: string, description: ISO timestamp when the blob was first observed }
           - { name: last_seen, type: string, description: ISO timestamp when the blob was most recently observed }
+          - { name: size, type: int, description: Size of the stored blob in bytes }
+          - { name: compression, type: boolean, description: True when payload is gzip-compressed, false otherwise, null for external blobs }
+          - { name: payload, type: blob, description: Inline blob payload when stored directly in the table }

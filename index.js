@@ -158,7 +158,9 @@ async function attachBlobsToAssets(assets,blobManager,blobState,timestamp){
                 const blobEntry = registerBlob(blobState,{
                     hash:result.hash,
                     size:result.size ?? buffer.length,
-                    path:result.path ?? null
+                    path:result.path ?? null,
+                    payload:result.payload ?? null,
+                    compression:result.compression ?? null
                 },timestamp)
                 if(blobEntry){
                     asset.blob_uid = blobEntry.blob_uid
@@ -173,7 +175,9 @@ async function attachBlobsToAssets(assets,blobManager,blobState,timestamp){
                     const blobEntry = registerBlob(blobState,{
                         hash:result.hash,
                         size:result.size ?? null,
-                        path:result.path ?? null
+                        path:result.path ?? null,
+                        payload:result.payload ?? null,
+                        compression:result.compression ?? null
                     },timestamp)
                     if(blobEntry){
                         asset.blob_uid = blobEntry.blob_uid
@@ -211,6 +215,18 @@ function registerBlob(blobState,data,timestamp){
     }
     if(data.path){
         entry.path = data.path
+    }
+    if(Object.hasOwn(data,'payload') && data.payload !== null && data.payload !== undefined){
+        entry.payload = data.payload
+    }
+    if(Object.hasOwn(data,'compression')){
+        if(data.compression === null || data.compression === undefined){
+            if(!Object.hasOwn(entry,'compression')){
+                entry.compression = null
+            }
+        }else{
+            entry.compression = data.compression
+        }
     }
     if(timestamp){
         if(!entry.first_seen){
