@@ -107,10 +107,10 @@ async function createStructureDbWriter(options = {}) {
         return null;
     }
     const documentsSchema = requireTableSchema(schema, 'documents');
-    const assetsSchema = requireTableSchema(schema, 'assets');
-    const blobsSchema = requireTableSchema(schema, 'blobs');
+    const assetInfoSchema = requireTableSchema(schema, 'asset_info');
+    const blobStoreSchema = requireTableSchema(schema, 'blob_store');
     const itemsSchema = requireTableSchema(schema, 'items');
-    const assetVersionSchema = requireTableSchema(schema, 'asset_version');
+    const assetsSchema = requireTableSchema(schema, 'assets');
     runInTransaction(db, () => {
         createTables(db, schema);
         syncTableColumns(db, schema);
@@ -120,7 +120,7 @@ async function createStructureDbWriter(options = {}) {
         const {row, items, assetVersions} = payload;
         persistDocuments(db, [row], documentsSchema, {transaction: false});
         persistSimpleRows(db, 'items', itemsSchema.insertColumns, items, {transaction: false});
-        persistSimpleRows(db, 'asset_version', assetVersionSchema.insertColumns, assetVersions, {transaction: false});
+        persistSimpleRows(db, 'assets', assetsSchema.insertColumns, assetVersions, {transaction: false});
     });
     return {
         insertDocument(entry, content, tree, assets) {
@@ -135,10 +135,10 @@ async function createStructureDbWriter(options = {}) {
             insertDocumentTx(payload);
         },
         insertAssets(assetsList = []) {
-            persistAssets(db, assetsList, assetsSchema);
+            persistAssetInfo(db, assetsList, assetInfoSchema);
         },
         insertBlobs(blobsList = []) {
-            persistBlobs(db, blobsList, blobsSchema);
+            persistBlobStore(db, blobsList, blobStoreSchema);
         }
     };
 }
@@ -576,7 +576,7 @@ function persistSimpleRows(db, tableName, columns, rows, options) {
     insertRows(db, tableName, columns, rows, options);
 }
 
-function persistAssets(db, assets, assetsSchema, options) {
+function persistAssetInfo(db, assets, assetsSchema, options) {
     if (!assets.length) {
         return;
     }
@@ -590,10 +590,10 @@ function persistAssets(db, assets, assetsSchema, options) {
         first_seen: asset.first_seen ?? null,
         last_seen: asset.last_seen ?? null
     }));
-    insertRows(db, 'assets', assetsSchema.insertColumns, rows, options);
+    insertRows(db, 'asset_info', assetsSchema.insertColumns, rows, options);
 }
 
-function persistBlobs(db, blobs, blobsSchema, options) {
+function persistBlobStore(db, blobs, blobsSchema, options) {
     if (!blobs.length) {
         return;
     }
@@ -605,7 +605,7 @@ function persistBlobs(db, blobs, blobsSchema, options) {
         first_seen: blob.first_seen ?? null,
         last_seen: blob.last_seen ?? null
     }));
-    insertRows(db, 'blobs', blobsSchema.insertColumns, rows, options);
+    insertRows(db, 'blob_store', blobsSchema.insertColumns, rows, options);
 }
 
 function resolveLinkAssetUid(doc, linkEntry, node) {

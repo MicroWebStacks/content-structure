@@ -109,10 +109,10 @@ the config parameter is optional and do have default values
     * `tree.json` the raw output of the remark AST parser
     * content.json with the parameters and parsed content parameters
 * `.structure/structure.db` : a SQLite database (powered by better-sqlite3) that mirrors the JSON output.  
-  The database exposes the tables `documents`, `assets`, `items`, and `asset_version`.  
+  The database exposes the tables `documents`, `items`, `assets`, `asset_info`, and `blob_store`.  
   Repeating values are normalised into dedicated tables, while any retained list uses a `*_list` column that stores a JSON string of the related ids.  
   Items flatten the AST of every markdown document using a stable `version_id` per run and now embed inline asset references directly as `asset://type/asset_uid` Markdown tokens.  
-  `asset_version` rows keep per-run joins between assets and documents without placeholder ids, and asset rows now store the blob hash, byte size, and resolved blobs path (built from the year/month/prefix layout) next to their existing metadata.
+  `assets` rows keep per-run joins between assets and documents without placeholder ids, `asset_info` rows store the asset catalog metadata, and `blob_store` rows capture the blob hash, byte size, and storage directory (built from the year/month/prefix layout) next to their existing metadata.
 
 ## Example generated output
 

@@ -37,6 +37,7 @@ async function collect(config){
     const documentIndex = Object.create(null)
     const blobManager = createBlobManager(runTimestamp)
     const blobState = createBlobState()
+    let documentOrder = 0
 
     const originalCwd = process.cwd()
     try{
@@ -45,6 +46,10 @@ async function collect(config){
             const {entry, markdownText, modelAsset} = source ?? {}
             if(!entry){
                 continue
+            }
+            documentOrder += 1
+            if(entry.order === undefined || entry.order === null){
+                entry.order = documentOrder
             }
             documentIndex[entry.sid] = {
                 type:"document",

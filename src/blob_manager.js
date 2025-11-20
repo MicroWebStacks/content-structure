@@ -16,10 +16,25 @@ function getDateParts(timestamp) {
     };
 }
 
+function deriveStorageDir(relativePath) {
+    if (!relativePath) {
+        return null;
+    }
+    const segments = relativePath.split('/').filter(Boolean);
+    if (!segments.length) {
+        return null;
+    }
+    const startIndex = segments[0] === 'blobs' ? 1 : 0;
+    if (segments.length - startIndex >= 3) {
+        return segments.slice(startIndex, startIndex + 3).join('/');
+    }
+    return segments.slice(startIndex).join('/');
+}
+
 class BlobManager {
     constructor(timestamp) {
         this.timestamp = timestamp ?? new Date().toISOString();
-        this.hashIndex = new Map(); // hash -> {relativePath, size}
+        this.hashIndex = new Map(); // hash -> {relativePath, storageDir, size}
     }
 
     async ensureFromBuffer(buffer) {
@@ -31,18 +46,21 @@ class BlobManager {
         if (!existing) {
             const {year, month} = getDateParts(this.timestamp);
             const prefix = hash.slice(0, 2);
-            const relDir = ['blobs', String(year), formatMonth(month), prefix].join('/');
+            const storageDir = [String(year), formatMonth(month), prefix].join('/');
+            const relDir = ['blobs', storageDir].join('/');
             await check_dir_create(relDir);
             const relativePath = `${relDir}/${hash}`;
             await this.writeBlob(relativePath, buffer);
             const entry = {
                 relativePath,
+                storageDir,
                 size: buffer.length
             };
             this.hashIndex.set(hash, entry);
-            return {hash, size: entry.size, path: entry.relativePath};
+            return {hash, size: entry.size, path: entry.storageDir};
         }
-        return {hash, size: existing.size, path: existing.relativePath};
+        const storageDir = existing.storageDir ?? deriveStorageDir(existing.relativePath);
+        return {hash, size: existing.size, path: storageDir};
     }
 
     async ensureFromFile(absPath) {

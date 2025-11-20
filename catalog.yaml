@@ -13,6 +13,7 @@ datasets:
           - { name: slug, type: string, description: Slug used for building anchors and nested references }
           - { name: title, type: string, description: Document title resolved from folder names or front matter }
           - { name: level, type: int, description: Depth of the document in the navigation tree }
+          - { name: order, type: int, description: Collection order for the document; lower numbers appeared earlier in the run }
           - { name: tags, type: string_list, description: JSON list of tags assigned to the document via front matter or metadata }
           - { name: date, type: string, description: ISO 8601 date assigned to the document via front matter or metadata }
           - { name: lastmod, type: string, description: ISO 8601 timestamp of the last modification time of the source file }
@@ -31,31 +32,31 @@ datasets:
           - { name: level, type: int, description: Approximate nesting or heading depth derived from the AST }
           - { name: order_index, type: int, description: Order of appearance within the document }
           - { name: body_text, type: string, description: Textual body with inline asset references expressed as asset:// links }
-      - name: asset_version
+      - name: assets
         description: Version-specific rows that connect each document asset to the collection run for downstream joins.
         columns:
-          - { name: asset_uid, type: string, primary: true, description: UID of the referenced asset as stored in the assets table }
+          - { name: asset_uid, type: string, primary: true, description: UID of the referenced asset as stored in the asset_info table }
           - { name: version_id, type: string, description: Encoded seconds-since-2000 identifier for the collection run }
           - { name: doc_sid, type: string, description: SID of the document that owns the item }
           - { name: blob_uid, type: string, description: UID of the blob row referenced by this asset }
           - { name: role, type: string, description: Role of the asset within the item such as inline_image, table_data, or code_block }
-      - name: assets
+      - name: asset_info
         description: Asset catalog linking documents to their concrete payloads via blob hashes derived from code blocks, tables, image references, models, and loose files.
         columns:
           - { name: uid, type: string, primary: true, description: Stable identifier composed from the document uid and asset slug }
           - { name: type, type: string, values: [file, codeblock, table, model], description: Asset type such as codeblock, table, file, or model }
-          - { name: blob_uid, type: string, description: UID joining to the blobs table entry }
+          - { name: blob_uid, type: string, description: UID joining to the blob_store table entry }
           - { name: parent_doc_uid, type: string, description: UID of the document that introduced the asset }
           - { name: path, type: string, description: Source-relative path for file-backed assets }
           - { name: ext, type: string, description: File extension for referenced files when available }
           - { name: first_seen, type: string, description: ISO timestamp when the asset was first observed }
           - { name: last_seen, type: string, description: ISO timestamp when the asset was most recently observed }
-      - name: blobs
+      - name: blob_store
         description: Unique blob payloads materialized on disk and shared across assets via their SHA-512 hash.
         columns:
           - { name: blob_uid, type: string, primary: true, description: Monotonic hex identifier for the blob row }
           - { name: hash, type: string, description: SHA-512 hash identifying the blob }
           - { name: size, type: int, description: Size of the stored blob in bytes }
-          - { name: path, type: string, description: Relative path including the blobs/year/month/prefix layout }
+          - { name: path, type: string, description: Directory path within the blob store hierarchy such as YYYY/MM/ff }
           - { name: first_seen, type: string, description: ISO timestamp when the blob was first observed }
           - { name: last_seen, type: string, description: ISO timestamp when the blob was most recently observed }
