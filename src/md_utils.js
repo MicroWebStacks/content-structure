@@ -1,12 +1,29 @@
 import slugify from 'slugify'
 import { file_ext, get_next_uid, load_text, exists } from './utils.js'
-import {dirname, basename,parse, extname, join} from 'path'
+import {dirname, basename,parse, join} from 'path'
 import {remark} from 'remark'
 import remarkDirective from 'remark-directive'
 import remarkGfm from 'remark-gfm';
 import { JSDOM } from 'jsdom';
 import { shortMD5, get_config } from './collect.js';
 import { debug, warn } from './libs/log.js';
+
+function sanitizeTag(value){
+    if(value === null || value === undefined){
+        return null
+    }
+    const trimmed = String(value).trim()
+    if(!trimmed){
+        return null
+    }
+    return slugify(trimmed,{lower:true})
+}
+
+function ensureUniqueSlug(state, slug){
+    const unique = get_next_uid(slug, state.assetSlugs)
+    state.assetSlugs.push(unique)
+    return unique
+}
 
 async function get_image_text(path){
     if(!await exists(path)){
@@ -90,24 +107,22 @@ function title_slug(title){
   return slug
 }
 
-function code_slug(node,language){
-    let slug = language
-    if(node.meta != null){
-        slug += '-'+node.meta.split(/\s+/).join('-')
+function code_title_slug(node){
+    if(!node?.meta){
+        return null
     }
-    return slug
+    const title = node.meta.split(/\s+/).join(' ')
+    return sanitizeTag(title)
 }
 
-function image_slug(node){
-    if(node.title !== null){
-        return slugify(node.title,{lower:true})
+function image_name_slug(rawUrl){
+    if(!rawUrl){
+        return 'image'
     }
-    if(node.alt !== null){
-        return slugify(node.alt,{lower:true})
-    }
-    const filename = parse(basename(node.url)).name
-    return slugify(filename,{lower:true})
-    
+    const cleanPath = rawUrl.split(/[?#]/)[0]
+    const filename = parse(basename(cleanPath)).name
+    const slug = sanitizeTag(filename)
+    return slug ?? 'image'
 }
 
 function link_slug(node,text){
@@ -205,11 +220,11 @@ async function walkDocumentTree(tree, entry){
         paragraphs:[],
         links:[],
         assets:[],
+        assetSlugs:[],
         headingSlugs:[],
-        imageSlugs:[],
-        codeSlugs:[],
         linkSlugs:[],
         tableCounter:0,
+        codeCounter:0,
         currentHeading:null
     }
 
@@ -289,7 +304,8 @@ function createHeadingEntry(node, state){
 function createTableEntry(node, state){
     state.tableCounter += 1
     const id = `table-${state.tableCounter}`
-    const uid = `${state.entry.uid}#${id}`
+    const slug = ensureUniqueSlug(state, id)
+    const uid = `${state.entry.uid}#${slug}`
     const data = astToObjectsList(node)
     const tableEntry = {
         id,
@@ -311,13 +327,16 @@ function createTableEntry(node, state){
 }
 
 function createCodeEntry(node, state){
-    const language = node.lang ? node.lang : 'code'
-    const slug = code_slug(node,language)
-    const unique_slug = get_next_uid(slug,state.codeSlugs)
-    state.codeSlugs.push(unique_slug)
-    const uid = `${state.entry.uid}#${unique_slug}`
+    const language = node.lang ? node.lang : null
+    const languageTag = language ? sanitizeTag(language) : null
+    state.codeCounter += 1
+    const titleSlug = code_title_slug(node)
+    const baseName = titleSlug ? `code-${titleSlug}` : `code-${state.codeCounter}`
+    const slugBase = languageTag ? `${baseName}.${languageTag}` : baseName
+    const slug = ensureUniqueSlug(state, slugBase)
+    const uid = `${state.entry.uid}#${slug}`
     const codeEntry = {
-        id:unique_slug,
+        id:baseName,
         uid,
         sid:shortMD5(uid),
         language,
@@ -348,12 +367,15 @@ function recordParagraph(node, state){
 }
 
 async function createImageEntry(node, state){
-    const slug = image_slug(node)
-    const unique_slug = get_next_uid(slug,state.imageSlugs)
-    state.imageSlugs.push(unique_slug)
-    const uid = `${state.entry.uid}#${unique_slug}`
+    const rawUrl = typeof node.url === 'string' ? node.url.trim() : ''
+    const extRaw = file_ext(rawUrl)
+    const extTag = sanitizeTag(extRaw)
+    const baseName = image_name_slug(rawUrl)
+    const slugBase = extTag ? `image-${baseName}.${extTag}` : `image-${baseName}`
+    const slug = ensureUniqueSlug(state, slugBase)
+    const uid = `${state.entry.uid}#${slug}`
     const imageEntry = {
-        id:unique_slug,
+        id:baseName,
         uid,
         sid:shortMD5(uid),
         heading:getHeadingSlug(state),
@@ -362,14 +384,14 @@ async function createImageEntry(node, state){
         alt:node.alt,
         text_list:[]
     }
-    const asset = await buildImageAsset(node, state, imageEntry)
+    const asset = await buildImageAsset(node, state, imageEntry, extRaw)
     if(asset){
         state.assets.push(asset)
     }
     state.images.push(imageEntry)
 }
 
-async function buildImageAsset(node, state, imageEntry){
+async function buildImageAsset(node, state, imageEntry, extRaw){
     const rawUrl = typeof node.url === 'string' ? node.url.trim() : ''
     if(!rawUrl || isExternalAssetUrl(rawUrl)){
         return null
@@ -393,7 +415,7 @@ async function buildImageAsset(node, state, imageEntry){
         document:state.entry.sid,
         parent_doc_uid:state.entry.uid,
         path,
-        ext:file_ext(rawUrl),
+        ext:extRaw ?? file_ext(rawUrl),
         exists:true,
         abs_path:join(state.config.contentdir ?? '', path)
     }

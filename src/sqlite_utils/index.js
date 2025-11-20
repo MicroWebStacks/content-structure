@@ -71,7 +71,26 @@ function insertRows(db, tableName, columns, rows, options = {}) {
             for (const column of columns) {
                 params[column] = Object.hasOwn(row, column) ? row[column] : null;
             }
-            statement.run(params);
+            try {
+                statement.run(params);
+            } catch (error) {
+                const uid =
+                    Object.hasOwn(params, 'uid') && params.uid != null
+                        ? String(params.uid)
+                        : Object.hasOwn(params, 'asset_uid') && params.asset_uid != null
+                            ? String(params.asset_uid)
+                            : null;
+                const context = [];
+                context.push(`content-structure: failed inserting into table '${tableName}'`);
+                if (uid !== null) {
+                    context.push(`  offending uid: ${uid}`);
+                }
+                context.push(`  columns: ${JSON.stringify(columns)}`);
+                context.push(`  row: ${JSON.stringify(params)}`);
+                // eslint-disable-next-line no-console
+                console.error(context.join('\n'));
+                throw error;
+            }
         }
     };
     if (transaction) {
