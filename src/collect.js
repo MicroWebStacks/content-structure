@@ -1,9 +1,7 @@
 import {globStream} from 'glob'
 import { relative, resolve, join, sep, basename, dirname, parse, extname } from 'path';
 import { load_text,exists,exists_public } from './utils.js';
-import { md_tree, title_slug, extract_headings,
-    extract_tables,extract_images,extract_code,
-    extract_paragraphs, extract_links } from './md_utils.js';
+import { title_slug, buildDocumentContent } from './md_utils.js';
 import matter from 'gray-matter';
 import { createHash } from 'crypto';
 import {warn} from './libs/log.js'
@@ -150,7 +148,7 @@ function get_url_type(file_path){
 async function createMarkdownDocumentSource(file_path){
     const url_type = get_url_type(file_path)
     const markdownText = await load_text(file_path)
-    const {data} = matter(markdownText)
+    const {data, content: bodyContent} = matter(markdownText)
     const knownEntryFields = await getKnownEntryFieldSet()
     const {entryFields, modelFields} = partitionFrontmatter(data ?? {}, knownEntryFields)
 
@@ -179,7 +177,7 @@ async function createMarkdownDocumentSource(file_path){
     }
     return {
         entry,
-        markdownText:markdownText,
+        markdownText:bodyContent ?? '',
         modelAsset
     }
 }
@@ -314,22 +312,15 @@ async function* iterate_documents(){
 }
 
 async function tree_content(markdown_text,entry_details){
-    const {content, data} = matter(markdown_text)
-    const tree = md_tree(content)
-    const headings = extract_headings(tree,entry_details.uid)
-    entry_details.headings = headings
-    const tables = extract_tables(tree,headings,entry_details)
-    entry_details.tables = tables
-    const images = await extract_images(tree,headings,entry_details)
-    entry_details.images = images
-    const code = extract_code(tree,headings,entry_details)
-    entry_details.code = code
-    const paragraphs = extract_paragraphs(tree,headings)
-    entry_details.paragraphs = paragraphs
-    const links = extract_links(tree,headings)
-    entry_details.links = links
+    const {tree, document, assets} = await buildDocumentContent(entry_details, markdown_text)
+    entry_details.headings = document.headings
+    entry_details.tables = document.tables
+    entry_details.images = document.images
+    entry_details.code = document.code
+    entry_details.paragraphs = document.paragraphs
+    entry_details.links = document.links
 
-    return {tree,content:entry_details}
+    return {tree,content:entry_details,assets}
 }
 
 async function check_add_assets(asset_list,content_assets){

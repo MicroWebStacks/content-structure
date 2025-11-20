@@ -1,12 +1,9 @@
 import slugify from 'slugify'
-import { file_ext, get_next_uid,load_text } from './utils.js'
-import {visit} from "unist-util-visit";
-import {dirname, basename,parse, extname} from 'path'
+import { file_ext, get_next_uid, load_text, exists } from './utils.js'
+import {dirname, basename,parse, extname, join} from 'path'
 import {remark} from 'remark'
 import remarkDirective from 'remark-directive'
 import remarkGfm from 'remark-gfm';
-import {join} from 'path'
-import { exists } from './utils.js';
 import { JSDOM } from 'jsdom';
 import { shortMD5, get_config } from './collect.js';
 import { debug, warn } from './libs/log.js';
@@ -30,15 +27,6 @@ async function get_image_text(path){
     });
     debug(`   * found ${result.length} text entries in SVG`)
     return result
-}
-
-function heading_from_line(headings,line){
-    for(let i=headings.length-1;i>=0;i--){
-        if(headings[i].line < line){
-            return headings[i].slug
-        }
-    }
-    return null
 }
 
 function node_text_list(node){
@@ -151,69 +139,6 @@ function md_tree(content) {
     return markdownAST;
 }
 
-function extract_headings(tree,doc_uid){
-    let headings_list = []
-    let heading_slug_list = []
-    visit(tree, node=> {
-        if (node.type === 'heading') {
-            const heading_text = node_text(node)
-            const heading_slug = title_slug(heading_text)
-            const unique_heading_slug = get_next_uid(heading_slug,heading_slug_list)
-            heading_slug_list.push(unique_heading_slug)
-            const uid = doc_uid+"#"+unique_heading_slug
-            headings_list.push({
-                label:heading_text,
-                slug:unique_heading_slug,
-                uid: uid,
-                sid:shortMD5(uid),
-                depth:node.depth,
-                line:node.position.start.line
-            })
-        }
-    })
-    return headings_list
-}
-
-function extract_tables(tree,headings,entry){
-    let tables_list = []
-    let count = 1;
-    visit(tree, node=> {
-        if (node.type === 'table') {
-            const id = `table-${count}`
-            const uid = `${entry.uid}#${id}`
-            const data = astToObjectsList(node)
-            tables_list.push({
-                id:id,
-                uid:uid,
-                sid:shortMD5(uid),
-                heading:heading_from_line(headings,node.position.start.line),
-                text:node_text(node),
-                data:data
-            })
-            count+=1
-        }
-    })
-    return tables_list
-}
-
-function get_tables_info(entry,content){
-    const tables = []
-    if(content.tables.length > 0){
-        for(const table of content.tables){
-            const serialized = JSON.stringify(table.data ?? [])
-            tables.push({
-                type:"table",
-                uid:table.uid,
-                sid:table.sid,
-                document:entry.sid,
-                parent_doc_uid:entry.uid,
-                blob_content:serialized
-            })
-        }
-    }
-    return tables
-}
-
 function decodeAssetPath(pathValue){
     if(!pathValue){
         return pathValue
@@ -249,199 +174,291 @@ function isExternalAssetUrl(targetUrl){
     return /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trimmed)
 }
 
-async function extract_images(tree, headings,entry) {
-    const fileDir = dirname(entry.path)
-    let images_slug_list = [];
-    let imagePromises = [];
-    async function processImage(node) {
-            const slug = image_slug(node);
-            const unique_slug = get_next_uid(slug, images_slug_list);
-            images_slug_list.push(unique_slug);
-            const image_text = await get_image_text(join(fileDir,node.url));
-            const uid = `${entry.uid}#${unique_slug}`
-            return {
-                id: unique_slug,
-                uid:uid,
-                sid:shortMD5(uid),
-                heading: heading_from_line(headings, node.position.start.line),
-                title: node.title,
-                url: node.url,
-                alt: node.alt,
-                text_list: image_text,
-            }
-   }
-   visit(tree, 'image', (node) => {imagePromises.push(processImage(node))});
-   const images_list = await Promise.all(imagePromises);
-   return images_list;
+async function buildDocumentContent(entry, markdownText){
+    const tree = md_tree(markdownText ?? '')
+    const state = await walkDocumentTree(tree, entry)
+    return {
+        tree,
+        document:{
+            headings:state.headings,
+            tables:state.tables,
+            images:state.images,
+            code:state.codeBlocks,
+            paragraphs:state.paragraphs,
+            links:state.links
+        },
+        assets:state.assets
+    }
 }
 
-async function get_images_info(entry,content){
-    const file_links = []
-    if((content.images ?? []).length > 0){
-        for(const image of content.images){
-            if(isExternalAssetUrl(image.url)){
-                continue
+async function walkDocumentTree(tree, entry){
+    const config = get_config() ?? {}
+    const allowedLinkExtensions = buildAllowedLinkExtensions(config.file_link_ext)
+    const state = {
+        entry,
+        config,
+        allowedLinkExtensions,
+        headings:[],
+        tables:[],
+        images:[],
+        codeBlocks:[],
+        paragraphs:[],
+        links:[],
+        assets:[],
+        headingSlugs:[],
+        imageSlugs:[],
+        codeSlugs:[],
+        linkSlugs:[],
+        tableCounter:0,
+        currentHeading:null
+    }
+
+    async function visitNode(node){
+        if(!node){
+            return
+        }
+        switch(node.type){
+            case 'heading':
+                state.currentHeading = createHeadingEntry(node, state)
+                break
+            case 'table':
+                createTableEntry(node, state)
+                break
+            case 'code':
+                createCodeEntry(node, state)
+                break
+            case 'paragraph':
+                recordParagraph(node, state)
+                break
+            case 'image':
+                await createImageEntry(node, state)
+                break
+            case 'link':
+                await createLinkEntry(node, state)
+                break
+            default:
+                break
+        }
+        if(Array.isArray(node.children)){
+            for(const child of node.children){
+                await visitNode(child)
             }
-            const path = resolveDocumentAssetPath(entry,image.url)
-            if(!path || path.startsWith('/')){
-                continue
-            }
-            const existsLocally = await exists(path)
-            if(!existsLocally){
-                continue
-            }
-            file_links.push({
-                type:"image",
-                uid:image.uid,
-                sid:image.sid,
-                document:entry.sid,
-                parent_doc_uid:entry.uid,
-                path:path,
-                ext:file_ext(image.url)
-            })
         }
     }
-    return file_links
+
+    if(Array.isArray(tree?.children)){
+        for(const child of tree.children){
+            await visitNode(child)
+        }
+    }
+    return state
 }
 
-function extract_code(tree,headings,entry){
-    let code_list = []
-    let code_slug_list = []
-    visit(tree, node=> {
-        if (node.type === 'code') {
-            const language = node.lang?node.lang:"code"
-            const slug = code_slug(node,language)
-            const unique_slug = get_next_uid(slug,code_slug_list)
-            const uid = `${entry.uid}#${unique_slug}`
-            code_slug_list.push(unique_slug)
-            code_list.push({
-                id:unique_slug,
-                uid:uid,
-                sid:shortMD5(uid),
-                language:language,
-                heading:heading_from_line(headings,node.position.start.line),
-                text:node.value
-            })
-        }
+function buildAllowedLinkExtensions(values){
+    if(!Array.isArray(values) || values.length === 0){
+        return new Set()
+    }
+    const normalized = values
+        .map(ext => typeof ext === 'string' ? ext.toLowerCase() : '')
+        .filter(Boolean)
+    return new Set(normalized)
+}
+
+function getHeadingSlug(state){
+    return state?.currentHeading?.slug ?? null
+}
+
+function createHeadingEntry(node, state){
+    const heading_text = node_text(node)
+    const heading_slug = title_slug(heading_text)
+    const unique_heading_slug = get_next_uid(heading_slug,state.headingSlugs)
+    state.headingSlugs.push(unique_heading_slug)
+    const uid = `${state.entry.uid}#${unique_heading_slug}`
+    const entry = {
+        label:heading_text,
+        slug:unique_heading_slug,
+        uid,
+        sid:shortMD5(uid),
+        depth:node.depth,
+        line:node.position?.start?.line ?? null
+    }
+    state.headings.push(entry)
+    return entry
+}
+
+function createTableEntry(node, state){
+    state.tableCounter += 1
+    const id = `table-${state.tableCounter}`
+    const uid = `${state.entry.uid}#${id}`
+    const data = astToObjectsList(node)
+    const tableEntry = {
+        id,
+        uid,
+        sid:shortMD5(uid),
+        heading:getHeadingSlug(state),
+        text:node_text(node),
+        data
+    }
+    state.tables.push(tableEntry)
+    state.assets.push({
+        type:'table',
+        uid:tableEntry.uid,
+        sid:tableEntry.sid,
+        document:state.entry.sid,
+        parent_doc_uid:state.entry.uid,
+        blob_content:JSON.stringify(data ?? [])
     })
-    return code_list
 }
 
-function get_codes_info(entry,content){
-    const codes = []    
-    if(content.code.length > 0){
-        for(const code of content.code){
-            codes.push({
-                type:"codeblock",
-                uid:code.uid,
-                sid:code.sid,
-                document:entry.sid,
-                parent_doc_uid:entry.uid,
-                blob_content:code.text ?? '',
-                language:code.language
-            })
-        }
+function createCodeEntry(node, state){
+    const language = node.lang ? node.lang : 'code'
+    const slug = code_slug(node,language)
+    const unique_slug = get_next_uid(slug,state.codeSlugs)
+    state.codeSlugs.push(unique_slug)
+    const uid = `${state.entry.uid}#${unique_slug}`
+    const codeEntry = {
+        id:unique_slug,
+        uid,
+        sid:shortMD5(uid),
+        language,
+        heading:getHeadingSlug(state),
+        text:node.value
     }
-    return codes
-}
-
-//here we get paragraphs text only for search and returning sections 
-//but without images, tables, code content (inlineCode stays as text)
-function extract_paragraphs(tree,headings){
-    let paragraphs_list = []
-    visit(tree, "paragraph", node=> {
-        paragraphs_list.push({
-            heading:heading_from_line(headings,node.position.start.line),
-            text:node_text(node)
-        })
+    state.codeBlocks.push(codeEntry)
+    state.assets.push({
+        type:'codeblock',
+        uid:codeEntry.uid,
+        sid:codeEntry.sid,
+        document:state.entry.sid,
+        parent_doc_uid:state.entry.uid,
+        blob_content:codeEntry.text ?? '',
+        language:codeEntry.language
     })
-    return paragraphs_list
 }
 
-function extract_links(tree,headings){
-    let links_list = []
-    let slug_list = [];
-    visit(tree, "link", node=> {
-        const text = node_text(node)
-        const slug = link_slug(node,text)
-        const unique_slug = get_next_uid(slug, slug_list);
-        links_list.push({
-            id:unique_slug,
-            heading:heading_from_line(headings,node.position.start.line),
-            url: node.url,
-            title: node.title,
-            text: text
-        })
+function recordParagraph(node, state){
+    const text = node_text(node)
+    if(!text || !text.trim()){
+        return
+    }
+    state.paragraphs.push({
+        heading:getHeadingSlug(state),
+        text
     })
-    return links_list
 }
 
-async function get_links_info(entry, content){
-    const links = content?.links ?? []
-    if(links.length === 0){
-        return []
+async function createImageEntry(node, state){
+    const slug = image_slug(node)
+    const unique_slug = get_next_uid(slug,state.imageSlugs)
+    state.imageSlugs.push(unique_slug)
+    const uid = `${state.entry.uid}#${unique_slug}`
+    const imageEntry = {
+        id:unique_slug,
+        uid,
+        sid:shortMD5(uid),
+        heading:getHeadingSlug(state),
+        title:node.title,
+        url:node.url,
+        alt:node.alt,
+        text_list:[]
     }
-    const {file_link_ext = []} = get_config() ?? {}
-    if(!Array.isArray(file_link_ext) || file_link_ext.length === 0){
-        return []
+    const asset = await buildImageAsset(node, state, imageEntry)
+    if(asset){
+        state.assets.push(asset)
     }
-    const allowedExtensions = new Set(file_link_ext.map(ext => typeof ext === 'string' ? ext.toLowerCase() : '').filter(Boolean))
-    if(allowedExtensions.size === 0){
-        return []
+    state.images.push(imageEntry)
+}
+
+async function buildImageAsset(node, state, imageEntry){
+    const rawUrl = typeof node.url === 'string' ? node.url.trim() : ''
+    if(!rawUrl || isExternalAssetUrl(rawUrl)){
+        return null
     }
-    const assets = []
-    for(const link of links){
-        const rawUrl = typeof link.url === 'string' ? link.url.trim() : ''
-        if(!rawUrl){
-            continue
-        }
-        if(isExternalAssetUrl(rawUrl)){
-            continue
-        }
-        if(rawUrl.startsWith('/')){
-            continue
-        }
-        const extension = file_ext(rawUrl).toLowerCase()
-        if(!allowedExtensions.has(extension)){
-            continue
-        }
-        const path = resolveDocumentAssetPath(entry,rawUrl)
-        if(!path || path.startsWith('/')){
-            continue
-        }
-        const existsLocally = await exists(path)
-        if(!existsLocally){
-            continue
-        }
-        const assetId = link.id ? `link-${link.id}` : `link-${shortMD5(rawUrl)}`
-        const uid = `${entry.uid}#${assetId}`
-        assets.push({
-            type:"linked_file",
-            uid,
-            sid:shortMD5(uid),
-            document:entry.sid,
-            parent_doc_uid:entry.uid,
-            path:path,
-            ext:extension
-        })
+    const path = resolveDocumentAssetPath(state.entry, rawUrl)
+    if(!path || path.startsWith('/')){
+        return null
     }
-    return assets
+    const existsLocally = await exists(path)
+    if(!existsLocally){
+        return null
+    }
+    const textList = await get_image_text(path)
+    if(textList !== undefined && textList !== null){
+        imageEntry.text_list = textList
+    }
+    const asset = {
+        type:'image',
+        uid:imageEntry.uid,
+        sid:imageEntry.sid,
+        document:state.entry.sid,
+        parent_doc_uid:state.entry.uid,
+        path,
+        ext:file_ext(rawUrl),
+        exists:true,
+        abs_path:join(state.config.contentdir ?? '', path)
+    }
+    return asset
+}
+
+async function createLinkEntry(node, state){
+    const text = node_text(node)
+    const slug = link_slug(node,text)
+    const unique_slug = get_next_uid(slug,state.linkSlugs)
+    state.linkSlugs.push(unique_slug)
+    const linkEntry = {
+        id:unique_slug,
+        heading:getHeadingSlug(state),
+        url:node.url,
+        title:node.title,
+        text
+    }
+    state.links.push(linkEntry)
+    if(state.allowedLinkExtensions.size === 0){
+        return
+    }
+    const asset = await buildLinkAsset(node, state, linkEntry)
+    if(asset){
+        state.assets.push(asset)
+    }
+}
+
+async function buildLinkAsset(node, state, linkEntry){
+    const rawUrl = typeof node.url === 'string' ? node.url.trim() : ''
+    if(!rawUrl || isExternalAssetUrl(rawUrl) || rawUrl.startsWith('/')){
+        return null
+    }
+    const extension = file_ext(rawUrl).toLowerCase()
+    if(!state.allowedLinkExtensions.has(extension)){
+        return null
+    }
+    const path = resolveDocumentAssetPath(state.entry, rawUrl)
+    if(!path || path.startsWith('/')){
+        return null
+    }
+    const existsLocally = await exists(path)
+    if(!existsLocally){
+        return null
+    }
+    const assetId = linkEntry.id ? `link-${linkEntry.id}` : `link-${shortMD5(rawUrl)}`
+    const uid = `${state.entry.uid}#${assetId}`
+    return {
+        type:'linked_file',
+        uid,
+        sid:shortMD5(uid),
+        document:state.entry.sid,
+        parent_doc_uid:state.entry.uid,
+        path,
+        ext:extension,
+        exists:true,
+        abs_path:join(state.config.contentdir ?? '', path)
+    }
 }
 
 export{
     md_tree,
-    extract_headings,
-    extract_tables,
-    extract_images,
-    extract_code,
-    extract_paragraphs,
-    extract_links,
-    get_links_info,
+    buildDocumentContent,
     node_text_list,
     node_slug,
     title_slug,
-    node_text,
-    get_images_info,
-    get_tables_info,
-    get_codes_info
+    node_text
 }
