@@ -4,9 +4,9 @@ Parsed markdown is stored in SQLite tables that can be used for rendering and da
 ![design](design.drawio.svg)
 
 ## Deepwiki
-https://deepwiki.com/MicroWebStacks/content-structure
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/MicroWebStacks/content-structure)
 
-# install
+# Install
 prerequisites
 - choco
 - node-gyp
