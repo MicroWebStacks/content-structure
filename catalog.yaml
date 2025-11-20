@@ -30,6 +30,7 @@ datasets:
           - { name: level, type: int, description: Approximate nesting or heading depth derived from the AST }
           - { name: order_index, type: int, description: Order of appearance within the document }
           - { name: body_text, type: string, description: Textual body with inline asset references expressed as asset:// links }
+          - { name: ast, type: string, description: Serialized AST subtree for complex items, otherwise null }
       - name: assets
         description: Version-specific rows that connect each document asset to the collection run for downstream joins.
         columns:

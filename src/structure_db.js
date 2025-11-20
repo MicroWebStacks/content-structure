@@ -10,6 +10,8 @@ const DB_FILENAME = 'structure.db';
 const CATALOG_PATH = 'catalog.yaml';
 const STRUCTURE_DATASET_NAME = 'structure';
 const LIST_COLUMN_TYPES = new Set(['string_list', 'object_list']);
+const INLINE_COMPLEX_NODE_TYPES = new Set(['strong', 'emphasis', 'delete', 'inlineCode', 'code', 'html', 'link', 'image']);
+const TABLE_COMPLEX_NODE_TYPES = new Set(['image', 'link', 'strong', 'emphasis', 'delete', 'inlineCode', 'code', 'html']);
 
 let structureSchemaPromise;
 
@@ -273,10 +275,11 @@ function buildItemRows(doc, content, options = {}) {
     let codeCursor = 0;
     let linkCursor = 0;
 
-    function pushRow({type, text, level}) {
+    function pushRow({type, text, level, node}) {
         const sanitizedText = typeof text === 'string' ? text : '';
         const itemOrder = orderIndex;
         const itemUid = formatItemUid(doc.sid, itemOrder);
+        const astPayload = serializeAstIfNeeded(node, type);
         rows.push({
             uid: itemUid,
             version_id: versionId,
@@ -284,7 +287,8 @@ function buildItemRows(doc, content, options = {}) {
             type,
             level: Number.isFinite(level) ? level : null,
             order_index: itemOrder,
-            body_text: sanitizedText.length ? sanitizedText : null
+            body_text: sanitizedText.length ? sanitizedText : null,
+            ast: astPayload
         });
         orderIndex += 1;
     }
@@ -364,7 +368,8 @@ function buildItemRows(doc, content, options = {}) {
         pushRow({
             type: 'heading',
             text,
-            level
+            level,
+            node
         });
     }
 
@@ -378,7 +383,8 @@ function buildItemRows(doc, content, options = {}) {
                 pushRow({
                     type: 'paragraph',
                     text: fallbackText,
-                    level
+                    level,
+                    node
                 });
             }
             return;
@@ -389,7 +395,8 @@ function buildItemRows(doc, content, options = {}) {
                     pushRow({
                         type: 'paragraph',
                         text: segment.value,
-                        level
+                        level,
+                        node: segment.node ?? node
                     });
                 }
                 return;
@@ -400,17 +407,18 @@ function buildItemRows(doc, content, options = {}) {
             }
             if (segment.type === 'link') {
                 const handled = handleLink(segment.node, level, line);
-                if (!handled) {
-                    const text = node_text(segment.node) ?? '';
-                    if (text && text.trim()) {
-                        pushRow({
-                            type: 'paragraph',
-                            text,
-                            level
-                        });
-                    }
-                }
-                return;
+                        if (!handled) {
+                            const text = node_text(segment.node) ?? '';
+                            if (text && text.trim()) {
+                                pushRow({
+                                    type: 'paragraph',
+                                    text,
+                                    level,
+                                    node: segment.node ?? node
+                                });
+                            }
+                        }
+                        return;
             }
         });
     }
@@ -426,7 +434,8 @@ function buildItemRows(doc, content, options = {}) {
         pushRow({
             type: 'table',
             text,
-            level
+            level,
+            node
         });
     }
 
@@ -441,7 +450,8 @@ function buildItemRows(doc, content, options = {}) {
         pushRow({
             type: 'code',
             text,
-            level
+            level,
+            node
         });
     }
 
@@ -462,7 +472,8 @@ function buildItemRows(doc, content, options = {}) {
         pushRow({
             type: 'image',
             text,
-            level
+            level,
+            node
         });
     }
 
@@ -476,7 +487,8 @@ function buildItemRows(doc, content, options = {}) {
             pushRow({
                 type: 'link',
                 text: assetLink,
-                level
+                level,
+                node
             });
             return true;
         }
@@ -485,7 +497,8 @@ function buildItemRows(doc, content, options = {}) {
             pushRow({
                 type: 'paragraph',
                 text: label,
-                level
+                level,
+                node
             });
             return true;
         }
@@ -502,11 +515,12 @@ function buildItemRows(doc, content, options = {}) {
             if (!buffer.length) {
                 return;
             }
-            const synthetic = {type: 'paragraph', children: buffer};
-            const text = node_text(synthetic);
+            const children = buffer;
             buffer = [];
+            const synthetic = {type: 'paragraph', children};
+            const text = node_text(synthetic);
             if (text && text.trim()) {
-                segments.push({type: 'text', value: text});
+                segments.push({type: 'text', value: text, node: synthetic});
             }
         }
         for (const child of node.children) {
@@ -540,6 +554,50 @@ function buildItemRows(doc, content, options = {}) {
         recordAssetVersion(asset.uid, asset.type ?? null);
     }
     return {rows, assetVersions};
+}
+
+function serializeAstIfNeeded(node, itemType) {
+    if (!node || !shouldStoreAstForItem(node, itemType)) {
+        return null;
+    }
+    return serializeAstNode(node);
+}
+
+function shouldStoreAstForItem(node, itemType) {
+    if (!node) {
+        return false;
+    }
+    if (itemType === 'heading' || itemType === 'paragraph') {
+        return nodeContainsMatchingDescendant(node, (child) => INLINE_COMPLEX_NODE_TYPES.has(child.type));
+    }
+    if (itemType === 'table') {
+        return nodeContainsMatchingDescendant(node, (child) => TABLE_COMPLEX_NODE_TYPES.has(child.type));
+    }
+    return false;
+}
+
+function nodeContainsMatchingDescendant(node, predicate) {
+    if (!node || !Array.isArray(node.children) || typeof predicate !== 'function') {
+        return false;
+    }
+    for (const child of node.children) {
+        if (predicate(child)) {
+            return true;
+        }
+        if (nodeContainsMatchingDescendant(child, predicate)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function serializeAstNode(node) {
+    try {
+        return JSON.stringify(node);
+    } catch (error) {
+        warn(`(X) failed to serialize AST node: ${error.message}`);
+        return null;
+    }
 }
 
 function formatItemUid(docSid, orderIndex) {
