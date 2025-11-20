@@ -51,6 +51,9 @@ async function collect(config){
             if(entry.order === undefined || entry.order === null){
                 entry.order = documentOrder
             }
+            if(entry.version_id === undefined || entry.version_id === null){
+                entry.version_id = versionId
+            }
             documentIndex[entry.sid] = {
                 type:"document",
                 uid:entry.uid
