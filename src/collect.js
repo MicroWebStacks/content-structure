@@ -13,8 +13,9 @@ let config = {
     outdir: ".structure",
     debug:false,
     folder_single_doc:false,
-    blob_external_threshold_bytes: 1024 * 1024,
-    blob_inline_compression_min_bytes: 4 * 1024
+    external_storage_kb: 512,
+    inline_compression_kb: 32,
+    file_compress_ext: ['txt','md','json','csv','tsv','yaml','yml']
 }
 
 const DOCUMENTS_TABLE_NAME = 'documents'
