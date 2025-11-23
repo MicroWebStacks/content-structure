@@ -1,4 +1,5 @@
 import slugify from 'slugify'
+import { readdir } from 'fs/promises'
 import { file_ext, get_next_uid, load_text, exists } from './utils.js'
 import {dirname, basename,parse, join} from 'path'
 import {remark} from 'remark'
@@ -7,6 +8,7 @@ import remarkGfm from 'remark-gfm';
 import { JSDOM } from 'jsdom';
 import { shortMD5, get_config } from './collect.js';
 import { debug, warn } from './libs/log.js';
+import yaml from 'js-yaml'
 
 function sanitizeTag(value){
     if(value === null || value === undefined){
@@ -225,7 +227,8 @@ async function walkDocumentTree(tree, entry){
         linkSlugs:[],
         tableCounter:0,
         codeCounter:0,
-        currentHeading:null
+        currentHeading:null,
+        galleryAssetPaths:new Set()
     }
 
     async function visitNode(node){
@@ -240,7 +243,7 @@ async function walkDocumentTree(tree, entry){
                 createTableEntry(node, state)
                 break
             case 'code':
-                createCodeEntry(node, state)
+                await createCodeEntry(node, state)
                 break
             case 'paragraph':
                 recordParagraph(node, state)
@@ -326,7 +329,16 @@ function createTableEntry(node, state){
     })
 }
 
-function createCodeEntry(node, state){
+function isGalleryCodeBlock(node){
+    const language = typeof node?.lang === 'string' ? node.lang.trim().toLowerCase() : ''
+    if(language !== 'yaml'){
+        return false
+    }
+    const titleSlug = code_title_slug(node)
+    return titleSlug === 'gallery'
+}
+
+async function createCodeEntry(node, state){
     const language = node.lang ? node.lang : null
     const languageTag = language ? sanitizeTag(language) : null
     state.codeCounter += 1
@@ -353,6 +365,9 @@ function createCodeEntry(node, state){
         blob_content:codeEntry.text ?? '',
         language:codeEntry.language
     })
+    if(isGalleryCodeBlock(node)){
+        await collectGalleryAssets(node, state, codeEntry)
+    }
 }
 
 function recordParagraph(node, state){
@@ -474,6 +489,119 @@ async function buildLinkAsset(node, state, linkEntry){
         exists:true,
         abs_path:join(state.config.contentdir ?? '', path)
     }
+}
+
+function normalizeRelativeAssetPath(pathValue){
+    if(typeof pathValue !== 'string'){
+        return null
+    }
+    const trimmed = pathValue.trim()
+    if(!trimmed){
+        return null
+    }
+    if(trimmed.startsWith('/')){
+        return null
+    }
+    return trimmed.replace(/^[.][\\/]/,'').replaceAll('\\','/')
+}
+
+async function collectGalleryAssets(node, state, codeEntry){
+    const parsed = parseGalleryYaml(node?.value)
+    if(parsed === null){
+        return
+    }
+    const paths = []
+    if(Array.isArray(parsed)){
+        for(const entry of parsed){
+            if(typeof entry === 'string' && entry.trim()){
+                paths.push(entry)
+            }else{
+                warn(`(X) skipping non-string gallery entry`)
+            }
+        }
+    }else if(parsed && typeof parsed === 'object' && !Array.isArray(parsed)){
+        const keys = Object.keys(parsed)
+        if(keys.length === 1 && keys[0] === 'dir' && typeof parsed.dir === 'string' && parsed.dir.trim()){
+            const dirRaw = parsed.dir.trim()
+            const dirPath = resolveDocumentAssetPath(state.entry, dirRaw)
+            if(!dirPath || dirPath.startsWith('/')){
+                warn(`(X) gallery dir is invalid or absolute '${parsed.dir}'`)
+                return
+            }
+            const files = await listGalleryDirFiles(dirPath, state)
+            for(const fileName of files){
+                paths.push(join(dirRaw, fileName).replaceAll('\\','/'))
+            }
+        }else{
+            warn(`(X) gallery yaml must be a list or {dir: <path>}`)
+            return
+        }
+    }else{
+        warn(`(X) gallery yaml must be a list or {dir: <path>}`)
+        return
+    }
+    for(const rawPath of paths){
+        await addGalleryAsset(rawPath, state, codeEntry)
+    }
+}
+
+function parseGalleryYaml(raw){
+    if(typeof raw !== 'string' || !raw.trim()){
+        return null
+    }
+    try{
+        return yaml.load(raw)
+    }catch(error){
+        warn(`(X) failed to parse gallery yaml: ${error.message}`)
+        return null
+    }
+}
+
+async function listGalleryDirFiles(dirPath, state){
+    const absDir = join(state.config.contentdir ?? '', dirPath)
+    try{
+        const entries = await readdir(absDir,{withFileTypes:true})
+        return entries.filter(entry => entry.isFile()).map(entry => entry.name)
+    }catch(error){
+        warn(`(X) failed to read gallery dir '${dirPath}': ${error.message}`)
+        return []
+    }
+}
+
+async function addGalleryAsset(rawPath, state, codeEntry){
+    const normalized = normalizeRelativeAssetPath(rawPath)
+    if(!normalized){
+        return
+    }
+    const resolvedPath = resolveDocumentAssetPath(state.entry, normalized)
+    if(!resolvedPath || resolvedPath.startsWith('/')){
+        return
+    }
+    const cleanedPath = resolvedPath.replace(/^[.][\\/]/,'').replaceAll('\\','/')
+    if(state.galleryAssetPaths.has(cleanedPath)){
+        return
+    }
+    const existsLocally = await exists(cleanedPath)
+    if(!existsLocally){
+        warn(`(X) gallery asset does not exist '${cleanedPath}'`)
+        return
+    }
+    state.galleryAssetPaths.add(cleanedPath)
+    const baseName = image_name_slug(cleanedPath)
+    const slugBase = codeEntry?.id ? `${codeEntry.id}.gallery-${baseName}` : `gallery-${baseName}`
+    const slug = ensureUniqueSlug(state, slugBase)
+    const uid = `${state.entry.uid}#${slug}`
+    state.assets.push({
+        type:'gallery_asset',
+        uid,
+        sid:shortMD5(uid),
+        document:state.entry.sid,
+        parent_doc_uid:state.entry.uid,
+        path:cleanedPath,
+        ext:file_ext(cleanedPath),
+        exists:true,
+        abs_path:join(state.config.contentdir ?? '', cleanedPath)
+    })
 }
 
 export{
