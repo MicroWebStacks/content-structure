@@ -10,6 +10,14 @@ import { shortMD5, get_config } from './collect.js';
 import { debug, warn } from './libs/log.js';
 import yaml from 'js-yaml'
 
+function safeDecodeURIComponent(value){
+    try{
+        return decodeURIComponent(value)
+    }catch(_error){
+        return value
+    }
+}
+
 function sanitizeTag(value){
     if(value === null || value === undefined){
         return null
@@ -18,7 +26,9 @@ function sanitizeTag(value){
     if(!trimmed){
         return null
     }
-    return slugify(trimmed,{lower:true})
+    const decoded = safeDecodeURIComponent(trimmed)
+    const normalized = decoded.replace(/\s+/g,' ')
+    return slugify(normalized,{lower:true})
 }
 
 function ensureUniqueSlug(state, slug){
@@ -341,19 +351,24 @@ function isGalleryCodeBlock(node){
 async function createCodeEntry(node, state){
     const language = node.lang ? node.lang : null
     const languageTag = language ? sanitizeTag(language) : null
+    const metaRaw = typeof node.meta === 'string' ? node.meta : null
+    const metaSlug = metaRaw ? sanitizeTag(metaRaw) : null
     state.codeCounter += 1
     const titleSlug = code_title_slug(node)
     const baseName = titleSlug ? `code-${titleSlug}` : `code-${state.codeCounter}`
-    const slugBase = languageTag ? `${baseName}.${languageTag}` : baseName
+    const metaAwareBase = metaSlug ? `${baseName}.${metaSlug}` : baseName
+    const slugBase = languageTag ? `${metaAwareBase}.${languageTag}` : metaAwareBase
     const slug = ensureUniqueSlug(state, slugBase)
     const uid = `${state.entry.uid}#${slug}`
+    const normalizedLanguage = languageTag ?? (typeof language === 'string' ? language.trim().toLowerCase() : null)
     const codeEntry = {
         id:baseName,
         uid,
         sid:shortMD5(uid),
         language,
         heading:getHeadingSlug(state),
-        text:node.value
+        text:node.value,
+        meta:metaRaw
     }
     state.codeBlocks.push(codeEntry)
     state.assets.push({
@@ -363,7 +378,9 @@ async function createCodeEntry(node, state){
         document:state.entry.sid,
         parent_doc_uid:state.entry.uid,
         blob_content:codeEntry.text ?? '',
-        language:codeEntry.language
+        language:codeEntry.language,
+        ext:normalizedLanguage ?? null,
+        meta:metaRaw
     })
     if(isGalleryCodeBlock(node)){
         await collectGalleryAssets(node, state, codeEntry)

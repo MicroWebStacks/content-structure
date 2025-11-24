@@ -291,7 +291,7 @@ function buildItemRows(doc, content, options = {}) {
         orderIndex += 1;
     }
 
-    function recordAssetVersion(assetUid, role) {
+    function recordAssetVersion(assetUid, assetType) {
         if (!assetUid) {
             return null;
         }
@@ -302,19 +302,20 @@ function buildItemRows(doc, content, options = {}) {
         const key = assetUid;
         if (!recordedAssetKeys.has(key)) {
             recordedAssetKeys.add(key);
+            const typeValue = asset.type ?? assetType ?? null;
             assetVersions.push({
                 asset_uid: asset.uid,
                 version_id: versionId,
                 doc_sid: doc.sid,
                 blob_uid: asset.blob_uid ?? null,
-                role: role ?? null
+                type: typeValue
             });
         }
         return asset;
     }
 
-    function createAssetLink(assetUid, role) {
-        const asset = recordAssetVersion(assetUid, role);
+    function createAssetLink(assetUid, assetType) {
+        const asset = recordAssetVersion(assetUid, assetType);
         if (!asset) {
             return null;
         }
@@ -658,6 +659,7 @@ function persistAssetInfo(db, assets, assetsSchema, options) {
         parent_doc_uid: asset.parent_doc_uid ?? null,
         path: asset.path ?? null,
         ext: asset.ext ?? null,
+        meta: asset.meta ?? null,
         first_seen: asset.first_seen ?? null,
         last_seen: asset.last_seen ?? null
     }));

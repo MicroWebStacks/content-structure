@@ -37,16 +37,17 @@ datasets:
           - { name: version_id, type: string, description: Encoded seconds-since-2000 identifier for the collection run }
           - { name: doc_sid, type: string, description: SID of the document that owns the item }
           - { name: blob_uid, type: string, description: UID of the blob row referenced by this asset }
-          - { name: role, type: string, description: Role of the asset within the item such as inline_image, table_data, or code_block }
+          - { name: type, type: string, description: Asset type recorded for this version (mirrors asset_info.type) }
       - name: asset_info
         description: Asset catalog linking documents to their concrete payloads via blob hashes derived from code blocks, tables, image references, and loose files.
         columns:
           - { name: uid, type: string, primary: true, description: Stable identifier composed from the document uid and asset slug }
-          - { name: type, type: string, values: [file, codeblock, table, model], description: Asset type such as codeblock, table, file, or model }
+          - { name: type, type: string, values: [file, codeblock, table, model, image, linked_file, gallery_asset, found], description: Asset type such as codeblock, table, file, or model }
           - { name: blob_uid, type: string, description: UID joining to the blob_store table entry }
           - { name: parent_doc_uid, type: string, description: UID of the document that introduced the asset }
           - { name: path, type: string, description: Source-relative path for file-backed assets }
           - { name: ext, type: string, description: File extension for referenced files when available }
+          - { name: meta, type: string, description: Raw metadata associated with the asset (currently only from code block meta) }
           - { name: first_seen, type: string, description: ISO timestamp when the asset was first observed }
           - { name: last_seen, type: string, description: ISO timestamp when the asset was most recently observed }
       - name: blob_store
