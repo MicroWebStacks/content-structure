@@ -339,24 +339,16 @@ function createTableEntry(node, state){
     })
 }
 
-function isGalleryCodeBlock(node){
-    const language = typeof node?.lang === 'string' ? node.lang.trim().toLowerCase() : ''
-    if(language !== 'yaml'){
-        return false
-    }
-    const titleSlug = code_title_slug(node)
-    return titleSlug === 'gallery'
-}
-
 async function createCodeEntry(node, state){
     const language = node.lang ? node.lang : null
     const languageTag = language ? sanitizeTag(language) : null
     const metaRaw = typeof node.meta === 'string' ? node.meta : null
     const metaSlug = metaRaw ? sanitizeTag(metaRaw) : null
+    const isGallery = (languageTag === 'yaml') && (typeof metaRaw === 'string' && metaRaw.trim().toLowerCase() === 'gallery')
     state.codeCounter += 1
     const titleSlug = code_title_slug(node)
-    const baseName = titleSlug ? `code-${titleSlug}` : `code-${state.codeCounter}`
-    const metaAwareBase = metaSlug ? `${baseName}.${metaSlug}` : baseName
+    const baseName = titleSlug ? `code-${state.codeCounter}-${titleSlug}` : `code-${state.codeCounter}`
+    const metaAwareBase = metaSlug ? `code-${state.codeCounter}-${metaSlug}` : baseName
     const slugBase = languageTag ? `${metaAwareBase}.${languageTag}` : metaAwareBase
     const slug = ensureUniqueSlug(state, slugBase)
     const uid = `${state.entry.uid}#${slug}`
@@ -382,7 +374,7 @@ async function createCodeEntry(node, state){
         ext:normalizedLanguage ?? null,
         meta:metaRaw
     })
-    if(isGalleryCodeBlock(node)){
+    if(isGallery){
         await collectGalleryAssets(node, state, codeEntry)
     }
 }
@@ -605,7 +597,7 @@ async function addGalleryAsset(rawPath, state, codeEntry){
     }
     state.galleryAssetPaths.add(cleanedPath)
     const baseName = image_name_slug(cleanedPath)
-    const slugBase = codeEntry?.id ? `${codeEntry.id}.gallery-${baseName}` : `gallery-${baseName}`
+    const slugBase = `${codeEntry.id}.${baseName}`
     const slug = ensureUniqueSlug(state, slugBase)
     const uid = `${state.entry.uid}#${slug}`
     state.assets.push({
