@@ -5,9 +5,9 @@ datasets:
       - name: documents
         description: One row per source document with extracted metadata, relationships, and embedded content references. Additional document metadata fields are stored either as scalar columns or serialized *_list columns as needed.
         columns:
+          - { name: version_id, type: string, description: Encoded seconds-since-2000 identifier for the collection run that produced the row }
           - { name: sid, type: string, primary: true, description: Stable short hash for the document }
           - { name: uid, type: string, description: Human-friendly identifier derived from the file path or slug }
-          - { name: version_id, type: string, description: Encoded seconds-since-2000 identifier for the collection run that produced the row }
           - { name: path, type: string, description: Relative source path inside the content tree }
           - { name: url, type: string, description: Public route exposed for the document }
           - { name: url_type, type: string, description: Indicates whether the URL maps to a directory or a file }
@@ -25,17 +25,19 @@ datasets:
         columns:
           - { name: version_id, type: string, description: Encoded seconds-since-2000 identifier for the collection run }
           - { name: doc_sid, type: string, description: SID of the parent document }
-          - { name: type, type: string, description: Item type such as heading, paragraph, table, code, or image }
+          - { name: slug, type: string, description: Page-unique slug usable as intra-page anchor }
+          - { name: asset_uid, type: string, description: UID of a single referenced asset when applicable }
           - { name: level, type: int, description: Approximate nesting or heading depth derived from the AST }
           - { name: order_index, type: int, description: Order of appearance within the document }
-          - { name: body_text, type: string, description: Textual body with inline asset references expressed as asset:// links }
+          - { name: type, type: string, description: Item type such as heading, paragraph, table, code, or image }
+          - { name: body_text, type: string, description: Textual body for the item; asset-linked items reference their asset via asset_uid }
           - { name: ast, type: string, description: Serialized AST subtree for complex items, otherwise null }
       - name: assets
         description: Version-specific rows that connect each document asset to the collection run for downstream joins.
         columns:
-          - { name: asset_uid, type: string, primary: true, description: UID of the referenced asset as stored in the asset_info table }
           - { name: version_id, type: string, description: Encoded seconds-since-2000 identifier for the collection run }
           - { name: doc_sid, type: string, description: SID of the document that owns the item }
+          - { name: asset_uid, type: string, primary: true, description: UID of the referenced asset as stored in the asset_info table }
           - { name: blob_uid, type: string, description: UID of the blob row referenced by this asset }
           - { name: type, type: string, description: Asset type recorded for this version (mirrors asset_info.type) }
       - name: asset_info

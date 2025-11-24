@@ -4,7 +4,7 @@ import { get_config, shortMD5 } from './collect.js';
 import { warn } from './libs/log.js';
 import { openDatabase, ensureTable, clearTable, insertRows, runInTransaction, ensureColumn } from './sqlite_utils/index.js';
 import { computeVersionId } from './version_id.js';
-import { node_text } from './md_utils.js';
+import { node_text, title_slug } from './md_utils.js';
 
 const DB_FILENAME = 'structure.db';
 const CATALOG_PATH = 'catalog.yaml';
@@ -274,14 +274,18 @@ function buildItemRows(doc, content, options = {}) {
     let imageCursor = 0;
     let codeCursor = 0;
     let linkCursor = 0;
+    const paragraphCounters = new Map();
+    let currentHeadingSlug = null;
 
-    function pushRow({type, text, level, node}) {
+    function pushRow({type, text, level, node, slug, assetUid}) {
         const sanitizedText = typeof text === 'string' ? text : '';
         const itemOrder = orderIndex;
         const astPayload = serializeAstIfNeeded(node, type);
         rows.push({
             version_id: versionId,
             doc_sid: doc.sid,
+            slug: slug ?? null,
+            asset_uid: assetUid ?? null,
             type,
             level: Number.isFinite(level) ? level : null,
             order_index: itemOrder,
@@ -314,20 +318,52 @@ function buildItemRows(doc, content, options = {}) {
         return asset;
     }
 
-    function createAssetLink(assetUid, assetType) {
+    function recordSingleAsset(assetUid, assetType) {
         const asset = recordAssetVersion(assetUid, assetType);
-        if (!asset) {
-            return null;
-        }
-        const schemeType = formatAssetType(asset.type);
-        return `![${schemeType}](asset:///${asset.uid})`;
+        return asset?.uid ?? null;
     }
 
-    function formatAssetType(type) {
-        if (!type) {
-            return 'asset';
+    function sanitizeSlug(value) {
+        const text = typeof value === 'string' ? value : '';
+        const trimmed = text.trim();
+        if (!trimmed) {
+            return null;
         }
-        return String(type).trim().replace(/[^a-zA-Z0-9_.-]+/g, '-').toLowerCase();
+        return title_slug(trimmed);
+    }
+
+    function extractAssetSlug(uid) {
+        if (typeof uid !== 'string') {
+            return null;
+        }
+        if (doc?.uid) {
+            const prefix = `${doc.uid}.`;
+            if (uid.startsWith(prefix)) {
+                const remainder = uid.slice(prefix.length);
+                return remainder || null;
+            }
+        }
+        const lastHash = uid.lastIndexOf('#');
+        if (lastHash >= 0) {
+            const remainder = uid.slice(lastHash + 1);
+            return remainder || null;
+        }
+        const lastDot = uid.lastIndexOf('.');
+        if (lastDot >= 0) {
+            const remainder = uid.slice(lastDot + 1);
+            return remainder || null;
+        }
+        return uid;
+    }
+
+    function buildParagraphSlug() {
+        const key = currentHeadingSlug ?? '__root__';
+        const next = (paragraphCounters.get(key) ?? 0) + 1;
+        paragraphCounters.set(key, next);
+        if (currentHeadingSlug) {
+            return `${currentHeadingSlug}-p${next}`;
+        }
+        return `p${next}`;
     }
 
     function processNode(node) {
@@ -364,11 +400,14 @@ function buildItemRows(doc, content, options = {}) {
         const headingEntry = headings[headingCursor++] ?? null;
         const text = headingEntry?.label ?? node_text(node) ?? '';
         const level = headingEntry?.depth ?? node.depth ?? 0;
+        const slug = headingEntry?.slug ?? sanitizeSlug(text);
+        currentHeadingSlug = slug ?? null;
         pushRow({
             type: 'heading',
             text,
             level,
-            node
+            node,
+            slug
         });
     }
 
@@ -379,41 +418,47 @@ function buildItemRows(doc, content, options = {}) {
         if (!segments.length) {
             const fallbackText = node_text(node) ?? '';
             if (fallbackText && fallbackText.trim()) {
+                const slug = buildParagraphSlug();
                 pushRow({
                     type: 'paragraph',
                     text: fallbackText,
                     level,
-                    node
+                    node,
+                    slug
                 });
             }
             return;
         }
         segments.forEach((segment) => {
-            if (segment.type === 'text') {
-                if (segment.value) {
-                    pushRow({
-                        type: 'paragraph',
-                        text: segment.value,
-                        level,
-                        node: segment.node ?? node
-                    });
+                if (segment.type === 'text') {
+                    if (segment.value) {
+                        const slug = buildParagraphSlug();
+                        pushRow({
+                            type: 'paragraph',
+                            text: segment.value,
+                            level,
+                            node: segment.node ?? node,
+                            slug
+                        });
+                    }
+                    return;
                 }
-                return;
-            }
-            if (segment.type === 'image') {
+                if (segment.type === 'image') {
                 handleImage(segment.node, level, line);
                 return;
-            }
-            if (segment.type === 'link') {
-                const handled = handleLink(segment.node, level, line);
+                }
+                if (segment.type === 'link') {
+                    const handled = handleLink(segment.node, level, line);
                         if (!handled) {
                             const text = node_text(segment.node) ?? '';
                             if (text && text.trim()) {
+                                const slug = buildParagraphSlug();
                                 pushRow({
                                     type: 'paragraph',
                                     text,
                                     level,
-                                    node: segment.node ?? node
+                                    node: segment.node ?? node,
+                                    slug
                                 });
                             }
                         }
@@ -428,13 +473,16 @@ function buildItemRows(doc, content, options = {}) {
         const level = getLevelForLine(line);
         const descriptionValue = tableEntry.text ?? tableEntry.id ?? 'table';
         const description = String(descriptionValue).trim();
-        const assetLink = createAssetLink(tableEntry.uid, 'table_data');
-        const text = assetLink ?? (description || 'table');
+        const assetSlug = extractAssetSlug(tableEntry.uid);
+        const assetUid = recordSingleAsset(tableEntry.uid, 'table_data');
+        const text = description || assetSlug || 'table';
         pushRow({
             type: 'table',
             text,
             level,
-            node
+            node,
+            slug: assetSlug,
+            assetUid
         });
     }
 
@@ -444,13 +492,16 @@ function buildItemRows(doc, content, options = {}) {
         const level = getLevelForLine(line);
         const language = codeEntry.language ?? node.lang ?? 'code';
         const label = `code(${language})`;
-        const assetLink = createAssetLink(codeEntry.uid, 'code_block');
-        const text = assetLink ?? label;
+        const assetSlug = extractAssetSlug(codeEntry.uid);
+        const assetUid = recordSingleAsset(codeEntry.uid, 'code_block');
+        const text = label;
         pushRow({
             type: 'code',
             text,
             level,
-            node
+            node,
+            slug: assetSlug,
+            assetUid
         });
     }
 
@@ -466,13 +517,16 @@ function buildItemRows(doc, content, options = {}) {
             labelParts.push(String(imageEntry.alt));
         }
         const label = labelParts.join(' ').trim() || 'image';
-        const assetLink = createAssetLink(imageEntry.uid, 'inline_image');
-        const text = assetLink ?? label;
+        const assetSlug = extractAssetSlug(imageEntry.uid);
+        const assetUid = recordSingleAsset(imageEntry.uid, 'inline_image');
+        const text = label;
         pushRow({
             type: 'image',
             text,
             level,
-            node
+            node,
+            slug: assetSlug,
+            assetUid
         });
     }
 
@@ -481,23 +535,18 @@ function buildItemRows(doc, content, options = {}) {
         const line = lineOverride ?? getNodeLine(node);
         const level = typeof levelOverride === 'number' ? levelOverride : getLevelForLine(line);
         const assetUid = resolveLinkAssetUid(doc, linkEntry, node);
-        const assetLink = assetUid ? createAssetLink(assetUid, 'linked_file') : null;
-        if (assetLink) {
+        const assetSlug = assetUid ? extractAssetSlug(assetUid) : null;
+        const resolvedUid = recordSingleAsset(assetUid, 'linked_file');
+        const label = formatLinkLabel(linkEntry, node) ?? assetSlug ?? 'link';
+        if (label) {
+            const slug = assetSlug ?? buildParagraphSlug();
             pushRow({
                 type: 'link',
-                text: assetLink,
-                level,
-                node
-            });
-            return true;
-        }
-        const label = formatLinkLabel(linkEntry, node);
-        if (label) {
-            pushRow({
-                type: 'paragraph',
                 text: label,
                 level,
-                node
+                node,
+                assetUid: resolvedUid ?? null,
+                slug
             });
             return true;
         }
@@ -688,13 +737,13 @@ function resolveLinkAssetUid(doc, linkEntry, node) {
         return null;
     }
     if (linkEntry?.id) {
-        return `${doc.uid}#link-${linkEntry.id}`;
+        return `${doc.uid}.link-${linkEntry.id}`;
     }
     const hashId = buildLinkHashId(node);
     if (!hashId) {
         return null;
     }
-    return `${doc.uid}#${hashId}`;
+    return `${doc.uid}.${hashId}`;
 }
 
 function buildLinkHashId(node) {

@@ -318,7 +318,7 @@ function createTableEntry(node, state){
     state.tableCounter += 1
     const id = `table-${state.tableCounter}`
     const slug = ensureUniqueSlug(state, id)
-    const uid = `${state.entry.uid}#${slug}`
+    const uid = `${state.entry.uid}.${slug}`
     const data = astToObjectsList(node)
     const tableEntry = {
         id,
@@ -351,7 +351,7 @@ async function createCodeEntry(node, state){
     const metaAwareBase = metaSlug ? `code-${state.codeCounter}-${metaSlug}` : baseName
     const slugBase = languageTag ? `${metaAwareBase}.${languageTag}` : metaAwareBase
     const slug = ensureUniqueSlug(state, slugBase)
-    const uid = `${state.entry.uid}#${slug}`
+    const uid = `${state.entry.uid}.${slug}`
     const normalizedLanguage = languageTag ?? (typeof language === 'string' ? language.trim().toLowerCase() : null)
     const codeEntry = {
         id:baseName,
@@ -397,7 +397,7 @@ async function createImageEntry(node, state){
     const baseName = image_name_slug(rawUrl)
     const slugBase = extTag ? `image-${baseName}.${extTag}` : `image-${baseName}`
     const slug = ensureUniqueSlug(state, slugBase)
-    const uid = `${state.entry.uid}#${slug}`
+    const uid = `${state.entry.uid}.${slug}`
     const imageEntry = {
         id:baseName,
         uid,
@@ -486,7 +486,7 @@ async function buildLinkAsset(node, state, linkEntry){
         return null
     }
     const assetId = linkEntry.id ? `link-${linkEntry.id}` : `link-${shortMD5(rawUrl)}`
-    const uid = `${state.entry.uid}#${assetId}`
+    const uid = `${state.entry.uid}.${assetId}`
     return {
         type:'linked_file',
         uid,
@@ -599,7 +599,7 @@ async function addGalleryAsset(rawPath, state, codeEntry){
     const baseName = image_name_slug(cleanedPath)
     const slugBase = `${codeEntry.id}.${baseName}`
     const slug = ensureUniqueSlug(state, slugBase)
-    const uid = `${state.entry.uid}#${slug}`
+    const uid = `${state.entry.uid}.${slug}`
     state.assets.push({
         type:'gallery_asset',
         uid,
