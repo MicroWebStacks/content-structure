@@ -362,10 +362,11 @@ async function createCodeEntry(node, state){
         language,
         heading:getHeadingSlug(state),
         text:node.value,
-        meta:metaRaw
+        meta:metaRaw,
+        meta_data:null
     }
     state.codeBlocks.push(codeEntry)
-    state.assets.push({
+    const codeAsset = {
         type:'codeblock',
         uid:codeEntry.uid,
         sid:codeEntry.sid,
@@ -374,13 +375,18 @@ async function createCodeEntry(node, state){
         blob_content:codeEntry.text ?? '',
         language:codeEntry.language,
         ext:normalizedLanguage ?? null,
-        meta:metaRaw
-    })
+        params:metaRaw,
+        meta_data:null
+    }
+    state.assets.push(codeAsset)
     if(isGallery){
         await collectGalleryAssets(node, state, codeEntry)
     }
     if(isModel){
-        await collectModelsAssets(node, state, codeEntry)
+        const modelMap = await collectModelsAssets(node, state, codeEntry)
+        if(modelMap && Object.keys(modelMap).length){
+            codeEntry.meta_data = modelMap
+        }
     }
 }
 
@@ -641,32 +647,37 @@ async function collectModelsAssets(node, state, codeEntry){
         return
     }
     const fields = ['src','poster','environment-image']
+    const mapping = {}
     for(const field of fields){
         const rawPath = parsed[field]
         if(typeof rawPath !== 'string' || !rawPath.trim()){
             continue
         }
-        await addModelAsset(rawPath, field, state, codeEntry)
+        const uid = await addModelAsset(rawPath, field, state, codeEntry)
+        if(uid){
+            mapping[field] = uid
+        }
     }
+    return mapping
 }
 
 async function addModelAsset(rawPath, role, state, codeEntry){
     const normalized = normalizeRelativeAssetPath(rawPath)
     if(!normalized){
-        return
+        return null
     }
     const resolvedPath = resolveDocumentAssetPath(state.entry, normalized)
     if(!resolvedPath || resolvedPath.startsWith('/')){
-        return
+        return null
     }
     const cleanedPath = resolvedPath.replace(/^[.][\\/]/,'').replaceAll('\\','/')
     if(state.modelAssetPaths.has(cleanedPath)){
-        return
+        return null
     }
     const existsLocally = await exists(cleanedPath)
     if(!existsLocally){
         warn(`(X) model asset does not exist '${cleanedPath}'`)
-        return
+        return null
     }
     state.modelAssetPaths.add(cleanedPath)
     const baseName = image_name_slug(cleanedPath)
@@ -685,6 +696,7 @@ async function addModelAsset(rawPath, role, state, codeEntry){
         abs_path:join(state.config.contentdir ?? '', cleanedPath),
         role:role ?? null
     })
+    return uid
 }
 
 export{

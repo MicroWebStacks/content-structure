@@ -49,7 +49,7 @@ datasets:
           - { name: parent_doc_uid, type: string, description: UID of the document that introduced the asset }
           - { name: path, type: string, description: Source-relative path for file-backed assets }
           - { name: ext, type: string, description: File extension for referenced files when available }
-          - { name: meta, type: string, description: Raw metadata associated with the asset (currently only from code block meta) }
+          - { name: params, type: string, description: Raw params associated with the asset (e.g., code block meta) }
           - { name: first_seen, type: string, description: ISO timestamp when the asset was first observed }
           - { name: last_seen, type: string, description: ISO timestamp when the asset was most recently observed }
       - name: blob_store

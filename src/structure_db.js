@@ -277,10 +277,10 @@ function buildItemRows(doc, content, options = {}) {
     const paragraphCounters = new Map();
     let currentHeadingSlug = null;
 
-    function pushRow({type, text, level, node, slug, assetUid}) {
+    function pushRow({type, text, level, node, slug, assetUid, ast}) {
         const sanitizedText = typeof text === 'string' ? text : '';
         const itemOrder = orderIndex;
-        const astPayload = serializeAstIfNeeded(node, type);
+        const astPayload = ast !== undefined ? ast : serializeAstIfNeeded(node, type);
         rows.push({
             version_id: versionId,
             doc_sid: doc.sid,
@@ -495,13 +495,22 @@ function buildItemRows(doc, content, options = {}) {
         const assetSlug = extractAssetSlug(codeEntry.uid);
         const assetUid = recordSingleAsset(codeEntry.uid, 'code_block');
         const text = label;
+        let astPayload = null;
+        if (codeEntry.meta_data && Object.keys(codeEntry.meta_data).length) {
+            try {
+                astPayload = JSON.stringify(codeEntry.meta_data);
+            } catch (error) {
+                warn(`(X) failed to serialize code meta_data: ${error.message}`);
+            }
+        }
         pushRow({
             type: 'code',
             text,
             level,
             node,
             slug: assetSlug,
-            assetUid
+            assetUid,
+            ast: astPayload
         });
     }
 
@@ -708,7 +717,8 @@ function persistAssetInfo(db, assets, assetsSchema, options) {
         parent_doc_uid: asset.parent_doc_uid ?? null,
         path: asset.path ?? null,
         ext: asset.ext ?? null,
-        meta: asset.meta ?? null,
+        params: asset.params ?? null,
+        meta_data: asset.meta_data ?? null,
         first_seen: asset.first_seen ?? null,
         last_seen: asset.last_seen ?? null
     }));
