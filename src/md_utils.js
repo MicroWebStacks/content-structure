@@ -681,7 +681,11 @@ async function addModelAsset(rawPath, role, state, codeEntry){
     }
     state.modelAssetPaths.add(cleanedPath)
     const baseName = image_name_slug(cleanedPath)
-    const slugBase = `${codeEntry.id}.${role ?? 'model'}.${baseName}`
+    const ext = file_ext(cleanedPath)
+    const extSlug = ext ? ext.toLowerCase() : null
+    const slugBase = extSlug
+        ? `${codeEntry.id}.${role ?? 'model'}.${baseName}.${extSlug}`
+        : `${codeEntry.id}.${role ?? 'model'}.${baseName}`
     const slug = ensureUniqueSlug(state, slugBase)
     const uid = `${state.entry.uid}.${slug}`
     state.assets.push({
