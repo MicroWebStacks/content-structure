@@ -238,7 +238,8 @@ async function walkDocumentTree(tree, entry){
         tableCounter:0,
         codeCounter:0,
         currentHeading:null,
-        galleryAssetPaths:new Set()
+        galleryAssetPaths:new Set(),
+        modelAssetPaths:new Set()
     }
 
     async function visitNode(node){
@@ -345,6 +346,7 @@ async function createCodeEntry(node, state){
     const metaRaw = typeof node.meta === 'string' ? node.meta : null
     const metaSlug = metaRaw ? sanitizeTag(metaRaw) : null
     const isGallery = (languageTag === 'yaml') && (typeof metaRaw === 'string' && metaRaw.trim().toLowerCase() === 'gallery')
+    const isModel = (languageTag === 'yaml') && (typeof metaRaw === 'string' && metaRaw.trim().toLowerCase() === 'glb')
     state.codeCounter += 1
     const titleSlug = code_title_slug(node)
     const baseName = titleSlug ? `code-${state.codeCounter}-${titleSlug}` : `code-${state.codeCounter}`
@@ -376,6 +378,9 @@ async function createCodeEntry(node, state){
     })
     if(isGallery){
         await collectGalleryAssets(node, state, codeEntry)
+    }
+    if(isModel){
+        await collectModelsAssets(node, state, codeEntry)
     }
 }
 
@@ -610,6 +615,75 @@ async function addGalleryAsset(rawPath, state, codeEntry){
         ext:file_ext(cleanedPath),
         exists:true,
         abs_path:join(state.config.contentdir ?? '', cleanedPath)
+    })
+}
+
+function parseModelYaml(raw){
+    if(typeof raw !== 'string' || !raw.trim()){
+        return null
+    }
+    try{
+        const parsed = yaml.load(raw)
+        if(parsed && typeof parsed === 'object' && !Array.isArray(parsed)){
+            return parsed
+        }
+        warn(`(X) model yaml must be an object with file fields`)
+        return null
+    }catch(error){
+        warn(`(X) failed to parse model yaml: ${error.message}`)
+        return null
+    }
+}
+
+async function collectModelsAssets(node, state, codeEntry){
+    const parsed = parseModelYaml(node?.value)
+    if(parsed === null){
+        return
+    }
+    const fields = ['src','poster','environment-image']
+    for(const field of fields){
+        const rawPath = parsed[field]
+        if(typeof rawPath !== 'string' || !rawPath.trim()){
+            continue
+        }
+        await addModelAsset(rawPath, field, state, codeEntry)
+    }
+}
+
+async function addModelAsset(rawPath, role, state, codeEntry){
+    const normalized = normalizeRelativeAssetPath(rawPath)
+    if(!normalized){
+        return
+    }
+    const resolvedPath = resolveDocumentAssetPath(state.entry, normalized)
+    if(!resolvedPath || resolvedPath.startsWith('/')){
+        return
+    }
+    const cleanedPath = resolvedPath.replace(/^[.][\\/]/,'').replaceAll('\\','/')
+    if(state.modelAssetPaths.has(cleanedPath)){
+        return
+    }
+    const existsLocally = await exists(cleanedPath)
+    if(!existsLocally){
+        warn(`(X) model asset does not exist '${cleanedPath}'`)
+        return
+    }
+    state.modelAssetPaths.add(cleanedPath)
+    const baseName = image_name_slug(cleanedPath)
+    const slugBase = `${codeEntry.id}.${role ?? 'model'}.${baseName}`
+    const slug = ensureUniqueSlug(state, slugBase)
+    const uid = `${state.entry.uid}.${slug}`
+    state.assets.push({
+        type:'model',
+        uid,
+        sid:shortMD5(uid),
+        document:state.entry.sid,
+        parent_doc_uid:state.entry.uid,
+        path:cleanedPath,
+        ext:file_ext(cleanedPath),
+        exists:true,
+        abs_path:join(state.config.contentdir ?? '', cleanedPath),
+        role:role ?? null
     })
 }
 
