@@ -385,7 +385,7 @@ async function createCodeEntry(node, state){
     if(isModel){
         const modelMap = await collectModelsAssets(node, state, codeEntry)
         if(modelMap && Object.keys(modelMap).length){
-            codeEntry.meta_data = modelMap
+            codeEntry.meta_data = {model:modelMap}
         }
     }
 }
@@ -560,8 +560,15 @@ async function collectGalleryAssets(node, state, codeEntry){
         warn(`(X) gallery yaml must be a list or {dir: <path>}`)
         return
     }
+    const galleryEntries = []
     for(const rawPath of paths){
-        await addGalleryAsset(rawPath, state, codeEntry)
+        const uid = await addGalleryAsset(rawPath, state, codeEntry)
+        if(uid){
+            galleryEntries.push({uid})
+        }
+    }
+    if(galleryEntries.length){
+        codeEntry.gallery_items = galleryEntries
     }
 }
 
@@ -591,20 +598,20 @@ async function listGalleryDirFiles(dirPath, state){
 async function addGalleryAsset(rawPath, state, codeEntry){
     const normalized = normalizeRelativeAssetPath(rawPath)
     if(!normalized){
-        return
+        return null
     }
     const resolvedPath = resolveDocumentAssetPath(state.entry, normalized)
     if(!resolvedPath || resolvedPath.startsWith('/')){
-        return
+        return null
     }
     const cleanedPath = resolvedPath.replace(/^[.][\\/]/,'').replaceAll('\\','/')
     if(state.galleryAssetPaths.has(cleanedPath)){
-        return
+        return null
     }
     const existsLocally = await exists(cleanedPath)
     if(!existsLocally){
         warn(`(X) gallery asset does not exist '${cleanedPath}'`)
-        return
+        return null
     }
     state.galleryAssetPaths.add(cleanedPath)
     const baseName = image_name_slug(cleanedPath)
@@ -622,6 +629,7 @@ async function addGalleryAsset(rawPath, state, codeEntry){
         exists:true,
         abs_path:join(state.config.contentdir ?? '', cleanedPath)
     })
+    return uid
 }
 
 function parseModelYaml(raw){

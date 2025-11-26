@@ -495,12 +495,19 @@ function buildItemRows(doc, content, options = {}) {
         const assetSlug = extractAssetSlug(codeEntry.uid);
         const assetUid = recordSingleAsset(codeEntry.uid, 'code_block');
         const text = label;
-        let astPayload = null;
+        const astData = {};
         if (codeEntry.meta_data && Object.keys(codeEntry.meta_data).length) {
+            Object.assign(astData, codeEntry.meta_data);
+        }
+        if (Array.isArray(codeEntry.gallery_items) && codeEntry.gallery_items.length) {
+            astData.gallery = codeEntry.gallery_items.map((entry) => ({uid: entry.uid}));
+        }
+        let astPayload = null;
+        if (Object.keys(astData).length) {
             try {
-                astPayload = JSON.stringify(codeEntry.meta_data);
+                astPayload = JSON.stringify(astData);
             } catch (error) {
-                warn(`(X) failed to serialize code meta_data: ${error.message}`);
+                warn(`(X) failed to serialize code ast metadata: ${error.message}`);
             }
         }
         pushRow({

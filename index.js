@@ -1,6 +1,6 @@
-import { join } from 'path'
+import { join, dirname } from 'path'
 import { exists, exists_public, file_ext } from './src/utils.js';
-import {iterate_documents, set_config, tree_content} from './src/collect.js'
+import {iterate_documents, set_config, tree_content, shortMD5} from './src/collect.js'
 import { debug, warn } from './src/libs/log.js';
 import { createStructureDbWriter } from './src/structure_db.js';
 import { createBlobManager } from './src/blob_manager.js';
@@ -62,6 +62,7 @@ async function collect(config){
             if(Array.isArray(documentAssets) && documentAssets.length > 0){
                 assetList.push(...documentAssets)
             }
+            await ensureFrontmatterImageAsset(entry, content, assetList)
 
             await annotateAssets(assetList,config)
             stampAssets(assetList, runTimestamp)
@@ -299,6 +300,115 @@ function buildOrderGroupKey(entry){
         : '.'
     const level = Number.isFinite(entry?.level) ? entry.level : 0
     return `${baseDir}|${level}`
+}
+
+function parseMetaObject(raw){
+    if(typeof raw !== 'string' || raw.trim().length === 0){
+        return {}
+    }
+    try{
+        const parsed = JSON.parse(raw)
+        if(parsed && typeof parsed === 'object' && !Array.isArray(parsed)){
+            return parsed
+        }
+    }catch(_error){
+        /* ignore malformed meta */
+    }
+    return {}
+}
+
+function isExternalPath(value){
+    if(!value){
+        return true
+    }
+    const trimmed = value.trim()
+    if(!trimmed){
+        return true
+    }
+    if(trimmed.startsWith('asset:///')){
+        return true
+    }
+    if(trimmed.startsWith('//')){
+        return true
+    }
+    return /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trimmed)
+}
+
+function normalizeRelativePath(pathValue){
+    if(!pathValue){
+        return null
+    }
+    return pathValue.replace(/^[.][\\/]/,'').replaceAll('\\','/')
+}
+
+function resolveEntryAssetPath(entry, target){
+    if(!target){
+        return null
+    }
+    const baseDir = typeof entry?.base_dir === 'string' && entry.base_dir.length > 0
+        ? entry.base_dir
+        : dirname(entry?.path ?? '')
+    if(!baseDir && target.startsWith('/')){
+        return null
+    }
+    if(target.startsWith('/')){
+        return target
+    }
+    return normalizeRelativePath(join(baseDir || '', target))
+}
+
+async function ensureFrontmatterImageAsset(entry, content, assetList){
+    if(!entry){
+        return
+    }
+    const metaSource = entry.meta_data ?? content?.meta_data
+    const meta = parseMetaObject(metaSource)
+    const imageValue = meta.image
+    if(typeof imageValue !== 'string' || imageValue.trim().length === 0){
+        return
+    }
+    if(isExternalPath(imageValue)){
+        return
+    }
+    const trimmed = imageValue.trim()
+    const existingUid = assetList.find((asset)=>asset?.uid === trimmed)
+    if(existingUid){
+        return
+    }
+    const resolved = resolveEntryAssetPath(entry, trimmed)
+    if(!resolved || resolved.startsWith('/')){
+        return
+    }
+    const cleanedPath = normalizeRelativePath(resolved)
+    if(!cleanedPath){
+        return
+    }
+    let asset = assetList.find((entryAsset)=>entryAsset?.path === cleanedPath)
+    if(!asset){
+        const existsLocally = await exists(cleanedPath)
+        if(!existsLocally){
+            return
+        }
+        const ext = file_ext(cleanedPath)
+        const slugBase = `meta-image-${shortMD5(`${entry.uid}:${cleanedPath}`)}${ext ? `.${ext.toLowerCase()}` : ''}`
+        const uid = `${entry.uid}.${slugBase}`
+        asset = {
+            type:'image',
+            uid,
+            sid:shortMD5(uid),
+            document:entry.sid,
+            parent_doc_uid:entry.uid,
+            path:cleanedPath,
+            ext:ext ?? null
+        }
+        assetList.push(asset)
+    }
+    meta.image = asset.uid
+    const serialized = JSON.stringify(meta)
+    entry.meta_data = serialized
+    if(content){
+        content.meta_data = serialized
+    }
 }
 
 
