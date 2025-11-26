@@ -1,5 +1,6 @@
-import { join, dirname } from 'path'
-import { exists, exists_public, file_ext } from './src/utils.js';
+import { join, dirname, parse } from 'path'
+import sharp from 'sharp';
+import { exists, exists_public, file_ext, exists_abs } from './src/utils.js';
 import {iterate_documents, set_config, tree_content, shortMD5} from './src/collect.js'
 import { debug, warn } from './src/libs/log.js';
 import { createStructureDbWriter } from './src/structure_db.js';
@@ -38,6 +39,7 @@ async function collect(config){
     const blobManager = createBlobManager(runTimestamp)
     const blobState = createBlobState()
     const orderTracker = createDocumentOrderTracker()
+    const imageCatalog = createImageCatalog()
 
     const originalCwd = process.cwd()
     try{
@@ -65,6 +67,7 @@ async function collect(config){
             await ensureFrontmatterImageAsset(entry, content, assetList)
 
             await annotateAssets(assetList,config)
+            await collectImageMetadata(assetList, imageCatalog)
             stampAssets(assetList, runTimestamp)
             await attachBlobsToAssets(assetList, blobManager, blobState, runTimestamp)
             writer.insertDocument(entry,content,tree,assetList)
@@ -75,6 +78,9 @@ async function collect(config){
         }
         if(blobState.catalog.size > 0){
             writer.insertBlobs(Array.from(blobState.catalog.values()))
+        }
+        if(imageCatalog.size > 0){
+            writer.insertImages(Array.from(imageCatalog.values()))
         }
     }finally{
         process.chdir(originalCwd)
@@ -411,6 +417,87 @@ async function ensureFrontmatterImageAsset(entry, content, assetList){
     }
 }
 
+function createImageCatalog(){
+    return new Map()
+}
+
+async function collectImageMetadata(assets, imageCatalog){
+    for(const asset of assets){
+        if(!asset || !asset.uid){
+            continue
+        }
+        if(asset.type !== 'image' && asset.type !== 'gallery_asset'){
+            continue
+        }
+        if(imageCatalog.has(asset.uid)){
+            continue
+        }
+        const absPath = asset.abs_path ?? null
+        if(!absPath){
+            continue
+        }
+        const existsOnDisk = await exists_abs(absPath)
+        if(!existsOnDisk){
+            continue
+        }
+        let metadata
+        try{
+            metadata = await sharp(absPath).metadata()
+        }catch(error){
+            warn(`(X) failed to read image metadata '${asset.path ?? asset.uid}': ${error.message}`)
+            continue
+        }
+        let width = metadata?.width ?? null
+        let height = metadata?.height ?? null
+        const orientation = metadata?.orientation
+        if(Number.isInteger(orientation) && orientation >= 5 && orientation <= 8){
+            const swapped = width
+            width = height
+            height = swapped
+        }
+        if(!Number.isFinite(width) || !Number.isFinite(height) || height === 0){
+            continue
+        }
+        const ratio = width / height
+        const extension = deriveImageExtension(asset)
+        const name = deriveImageName(asset)
+        imageCatalog.set(asset.uid,{
+            uid:asset.uid,
+            type:asset.type ?? null,
+            name:name ?? null,
+            extension:extension ?? null,
+            width:Math.round(width),
+            height:Math.round(height),
+            ratio:ratio
+        })
+    }
+}
+
+function deriveImageExtension(asset){
+    if(asset?.ext){
+        return String(asset.ext).toLowerCase()
+    }
+    const pathValue = asset?.path ?? ''
+    const ext = file_ext(pathValue)
+    return ext ? ext.toLowerCase() : null
+}
+
+function deriveImageName(asset){
+    const pathValue = asset?.path ?? ''
+    if(pathValue){
+        const parsed = parse(pathValue)
+        if(parsed.name){
+            return parsed.name
+        }
+    }
+    if(asset?.abs_path){
+        const parsedAbs = parse(asset.abs_path)
+        if(parsedAbs.name){
+            return parsedAbs.name
+        }
+    }
+    return null
+}
 
 export{
     collect,

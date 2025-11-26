@@ -63,3 +63,13 @@ datasets:
           - { name: size, type: int, description: Size of the stored blob in bytes }
           - { name: compression, type: boolean, description: True when payload is gzip-compressed, false otherwise, null for external blobs }
           - { name: payload, type: blob, description: Inline blob payload when stored directly in the table }
+      - name: images
+        description: Image metadata derived from on-disk files for image and gallery assets.
+        columns:
+          - { name: uid, type: string, primary: true, description: UID of the backing asset (image or gallery_asset) }
+          - { name: type, type: string, description: Asset type used when the image was extracted }
+          - { name: name, type: string, description: Filename without extension derived from the asset path }
+          - { name: extension, type: string, description: File extension for the image }
+          - { name: width, type: int, description: Pixel width after orientation correction }
+          - { name: height, type: int, description: Pixel height after orientation correction }
+          - { name: ratio, type: string, description: Aspect ratio width/height as a decimal string }

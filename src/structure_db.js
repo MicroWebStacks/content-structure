@@ -115,6 +115,7 @@ async function createStructureDbWriter(options = {}) {
     const blobStoreSchema = requireTableSchema(schema, 'blob_store');
     const itemsSchema = requireTableSchema(schema, 'items');
     const assetsSchema = requireTableSchema(schema, 'assets');
+    const imagesSchema = requireTableSchema(schema, 'images');
     runInTransaction(db, () => {
         createTables(db, schema);
         syncTableColumns(db, schema);
@@ -143,6 +144,9 @@ async function createStructureDbWriter(options = {}) {
         },
         insertBlobs(blobsList = []) {
             persistBlobStore(db, blobsList, blobStoreSchema);
+        },
+        insertImages(imagesList = []) {
+            persistImages(db, imagesList, imagesSchema);
         }
     };
 }
@@ -151,6 +155,7 @@ async function writeStructureDb({
     documents = [],
     assets = [],
     blobs = [],
+    images = [],
     documentContents,
     documentTrees,
     documentAssetsBySid,
@@ -174,6 +179,9 @@ async function writeStructureDb({
     }
     if (blobs.length) {
         writer.insertBlobs(blobs);
+    }
+    if (images.length) {
+        writer.insertImages(images);
     }
 }
 
@@ -747,6 +755,22 @@ function persistBlobStore(db, blobs, blobsSchema, options) {
         last_seen: blob.last_seen ?? null
     }));
     insertRows(db, 'blob_store', blobsSchema.insertColumns, rows, options);
+}
+
+function persistImages(db, images, imagesSchema, options) {
+    if (!images.length) {
+        return;
+    }
+    const rows = images.map((image) => ({
+        uid: image.uid ?? null,
+        type: image.type ?? null,
+        name: image.name ?? null,
+        extension: image.extension ?? null,
+        width: image.width ?? null,
+        height: image.height ?? null,
+        ratio: image.ratio ?? null
+    }));
+    insertRows(db, 'images', imagesSchema.insertColumns, rows, options);
 }
 
 function resolveLinkAssetUid(doc, linkEntry, node) {
