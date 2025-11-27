@@ -564,13 +564,15 @@ function buildItemRows(doc, content, options = {}) {
         const label = formatLinkLabel(linkEntry, node) ?? assetSlug ?? 'link';
         if (label) {
             const slug = assetSlug ?? buildParagraphSlug();
+            const astPayload = resolvedUid ? null : buildLinkAstPayload(node);
             pushRow({
                 type: 'link',
                 text: label,
                 level,
                 node,
                 assetUid: resolvedUid ?? null,
-                slug
+                slug,
+                ast: astPayload
             });
             return true;
         }
@@ -807,6 +809,21 @@ function formatLinkLabel(linkEntry, node) {
     const fallback = node_text(node) ?? '';
     const trimmed = fallback.trim();
     return trimmed.length ? trimmed : null;
+}
+
+function buildLinkAstPayload(node) {
+    if (!node) {
+        return null;
+    }
+    const url = typeof node.url === 'string' ? node.url : null;
+    const title = typeof node.title === 'string' ? node.title : null;
+    const payload = {title, url};
+    try {
+        return JSON.stringify(payload);
+    } catch (error) {
+        warn(`(X) failed to serialize link metadata: ${error.message}`);
+        return null;
+    }
 }
 
 function serializeList(list) {
