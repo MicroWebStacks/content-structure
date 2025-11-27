@@ -397,6 +397,12 @@ function buildItemRows(doc, content, options = {}) {
             case 'link':
                 handleLink(node);
                 return;
+            case 'textDirective':
+                handleTextDirective(node);
+                return;
+            case 'containerDirective':
+                handleContainerDirective(node);
+                return;
             default:
                 if (Array.isArray(node.children)) {
                     node.children.forEach(processNode);
@@ -577,6 +583,70 @@ function buildItemRows(doc, content, options = {}) {
             return true;
         }
         return false;
+    }
+
+    function extractDirectiveAttributes(node) {
+        const attributes = {};
+        if (node && node.attributes && typeof node.attributes === 'object') {
+            for (const [key, value] of Object.entries(node.attributes)) {
+                if (value !== undefined) {
+                    attributes[key] = value;
+                }
+            }
+        }
+        return attributes;
+    }
+
+    function handleTextDirective(node) {
+        const line = getNodeLine(node);
+        const level = getLevelForLine(line);
+        const attributes = extractDirectiveAttributes(node);
+        let astPayload = null;
+        const payload = {name:node.name,attributes};
+        if (Object.keys(attributes).length || node?.name) {
+            try {
+                astPayload = JSON.stringify(payload);
+            } catch (error) {
+                warn(`(X) failed to serialize textDirective attributes: ${error.message}`);
+            }
+        }
+        pushRow({
+            type: 'textDirective',
+            text: '',
+            level,
+            node,
+            slug: buildParagraphSlug(),
+            ast: astPayload
+        });
+    }
+
+    function handleContainerDirective(node) {
+        const line = getNodeLine(node);
+        const level = getLevelForLine(line);
+        const attributes = extractDirectiveAttributes(node);
+        let astPayload = null;
+        const payload = {name:node.name,attributes};
+        if(node.children){
+            payload.children = node.children;
+        }
+        if (Object.keys(attributes).length || node?.name) {
+            try {
+                astPayload = JSON.stringify(payload);
+            } catch (error) {
+                warn(`(X) failed to serialize containerDirective attributes: ${error.message}`);
+            }
+        }
+        pushRow({
+            type: 'containerDirective',
+            text: '',
+            level,
+            node,
+            slug: buildParagraphSlug(),
+            ast: astPayload
+        });
+        if (Array.isArray(node.children)) {
+            node.children.forEach(processNode);
+        }
     }
 
     function splitParagraphSegments(node) {
