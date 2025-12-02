@@ -2,7 +2,7 @@ import { join } from 'path';
 import { check_dir_create, load_yaml_code } from './utils.js';
 import { get_config, shortMD5 } from './collect.js';
 import { warn } from './libs/log.js';
-import { openDatabase, ensureTable, clearTable, insertRows, runInTransaction, ensureColumn } from './sqlite_utils/index.js';
+import { openDatabase, ensureTable, insertRows, runInTransaction, ensureColumn } from './sqlite_utils/index.js';
 import { computeVersionId } from './version_id.js';
 import { node_text, title_slug } from './md_utils.js';
 
@@ -12,6 +12,7 @@ const STRUCTURE_DATASET_NAME = 'structure';
 const LIST_COLUMN_TYPES = new Set(['string_list', 'object_list']);
 const INLINE_COMPLEX_NODE_TYPES = new Set(['strong', 'emphasis', 'delete', 'inlineCode', 'code', 'html', 'link', 'image']);
 const TABLE_COMPLEX_NODE_TYPES = new Set(['image', 'link', 'strong', 'emphasis', 'delete', 'inlineCode', 'code', 'html']);
+const VERSION_TYPE_VALUES = new Set(['daily', 'weekly', 'monthly', 'early', 'baseline']);
 
 let structureSchemaPromise;
 
@@ -103,6 +104,7 @@ async function createStructureDbWriter(options = {}) {
     const dbPath = join(config.outdir, DB_FILENAME);
     const schema = await getStructureSchema();
     const versionId = options?.versionId ?? computeVersionId();
+    const runDate = options?.runDate ?? new Date();
     let db;
     try {
         db = openDatabase(dbPath);
@@ -116,11 +118,18 @@ async function createStructureDbWriter(options = {}) {
     const itemsSchema = requireTableSchema(schema, 'items');
     const assetsSchema = requireTableSchema(schema, 'assets');
     const imagesSchema = requireTableSchema(schema, 'images');
+    const versionsSchema = requireTableSchema(schema, 'versions');
     runInTransaction(db, () => {
         createTables(db, schema);
+        reconcileTables(db, schema);
         syncTableColumns(db, schema);
-        resetTables(db, schema);
     });
+    const existingState = loadExistingState(db);
+    const versionRow = buildVersionRow(versionId, runDate, config, existingState);
+    if (versionRow) {
+        persistVersions(db, [versionRow], versionsSchema, {transaction: false});
+        existingState.versionIds.add(versionId);
+    }
     const insertDocumentTx = db.transaction((payload) => {
         const {row, items, assetVersions} = payload;
         persistDocuments(db, [row], documentsSchema, {transaction: false});
@@ -128,6 +137,7 @@ async function createStructureDbWriter(options = {}) {
         persistSimpleRows(db, 'assets', assetsSchema.insertColumns, assetVersions, {transaction: false});
     });
     return {
+        existingState,
         insertDocument(entry, content, tree, assets) {
             if (!entry) {
                 return;
@@ -140,13 +150,13 @@ async function createStructureDbWriter(options = {}) {
             insertDocumentTx(payload);
         },
         insertAssets(assetsList = []) {
-            persistAssetInfo(db, assetsList, assetInfoSchema);
+            persistAssetInfo(db, assetsList, assetInfoSchema, existingState);
         },
         insertBlobs(blobsList = []) {
-            persistBlobStore(db, blobsList, blobStoreSchema);
+            persistBlobStore(db, blobsList, blobStoreSchema, existingState);
         },
         insertImages(imagesList = []) {
-            persistImages(db, imagesList, imagesSchema);
+            persistImages(db, imagesList, imagesSchema, existingState);
         }
     };
 }
@@ -199,10 +209,252 @@ function syncTableColumns(db, schema) {
     }
 }
 
-function resetTables(db, schema) {
+function reconcileTables(db, schema) {
     for (const table of schema.tables.values()) {
-        clearTable(db, table.name);
+        const tableInfo = getTableInfo(db, table.name);
+        if (!tableInfo.length) {
+            ensureTable(db, table.name, table.createSql);
+            continue;
+        }
+        if (tableNeedsRebuild(table, tableInfo)) {
+            rebuildTable(db, table, tableInfo);
+        }
     }
+}
+
+function getTableInfo(db, tableName) {
+    try {
+        return db.prepare(`PRAGMA table_info("${tableName}")`).all();
+    } catch (error) {
+        warn(`(X) failed to inspect table '${tableName}': ${error.message}`);
+        return [];
+    }
+}
+
+function tableNeedsRebuild(table, tableInfo = []) {
+    const existingPrimary = extractPrimaryColumns(tableInfo);
+    const desiredPrimary = extractPrimaryColumnsFromSchema(table);
+    if (existingPrimary.length !== desiredPrimary.length) {
+        return true;
+    }
+    for (let index = 0; index < desiredPrimary.length; index += 1) {
+        if (desiredPrimary[index] !== existingPrimary[index]) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function extractPrimaryColumns(tableInfo = []) {
+    return tableInfo
+        .filter((row) => Number.isInteger(row?.pk) && row.pk > 0)
+        .sort((a, b) => a.pk - b.pk)
+        .map((row) => row.name);
+}
+
+function extractPrimaryColumnsFromSchema(table) {
+    return (table?.columns ?? [])
+        .filter((column) => column.primary)
+        .map((column) => column.name);
+}
+
+function rebuildTable(db, table, tableInfo = []) {
+    const tempName = `${table.name}__tmp_rebuild`;
+    const existingColumns = tableInfo.map((row) => row.name);
+    db.prepare(`DROP TABLE IF EXISTS "${tempName}"`).run();
+    ensureTable(db, tempName, table.createSql);
+    const copyColumns = table.columns
+        .filter((column) => !column.autoIncrement && existingColumns.includes(column.name))
+        .map((column) => `"${column.name}"`);
+    if (copyColumns.length) {
+        const columnSql = copyColumns.join(', ');
+        db.prepare(`INSERT INTO "${tempName}" (${columnSql}) SELECT ${columnSql} FROM "${table.name}"`).run();
+    }
+    db.prepare(`DROP TABLE "${table.name}"`).run();
+    db.prepare(`ALTER TABLE "${tempName}" RENAME TO "${table.name}"`).run();
+    db.__contentStructureColumns.delete(tempName);
+    db.__contentStructureColumns.delete(table.name);
+}
+
+function loadExistingState(db) {
+    const blobHashIndex = loadExistingBlobIndex(db);
+    const assetInfoKeys = loadExistingAssetInfoKeys(db);
+    const imageKeys = loadExistingImageKeys(db);
+    const knownBlobHashes = new Set(blobHashIndex.keys());
+    const maxBlobUid = computeMaxBlobUid(blobHashIndex);
+    const versionIds = loadExistingVersionIds(db);
+    return {
+        blobHashIndex,
+        knownBlobHashes,
+        assetInfoKeys,
+        imageKeys,
+        maxBlobUid,
+        versionIds
+    };
+}
+
+function loadExistingBlobIndex(db) {
+    try {
+        const rows = db
+            .prepare('SELECT hash, blob_uid, path, size, compression, first_seen, last_seen FROM "blob_store"')
+            .all();
+        const map = new Map();
+        for (const row of rows) {
+            if (!row?.hash) {
+                continue;
+            }
+            map.set(row.hash, {
+                hash: row.hash,
+                blob_uid: row.blob_uid ?? null,
+                path: row.path ?? null,
+                size: row.size ?? null,
+                compression: row.compression ?? null,
+                first_seen: row.first_seen ?? null,
+                last_seen: row.last_seen ?? null
+            });
+        }
+        return map;
+    } catch (error) {
+        warn(`(X) failed to load existing blob_store rows: ${error.message}`);
+        return new Map();
+    }
+}
+
+function computeMaxBlobUid(blobHashIndex = new Map()) {
+    let maxValue = 0;
+    for (const entry of blobHashIndex.values()) {
+        const numeric = parseBlobUid(entry?.blob_uid);
+        if (numeric > maxValue) {
+            maxValue = numeric;
+        }
+    }
+    return maxValue;
+}
+
+function parseBlobUid(blobUid) {
+    if (blobUid === null || blobUid === undefined) {
+        return 0;
+    }
+    const text = String(blobUid);
+    const hex = parseInt(text, 16);
+    if (Number.isFinite(hex) && hex >= 0) {
+        return hex;
+    }
+    const decimal = parseInt(text, 10);
+    if (Number.isFinite(decimal) && decimal >= 0) {
+        return decimal;
+    }
+    return 0;
+}
+
+function loadExistingAssetInfoKeys(db) {
+    try {
+        const rows = db.prepare('SELECT uid, blob_uid FROM "asset_info"').all();
+        const result = new Set();
+        for (const row of rows) {
+            result.add(buildAssetInfoKey(row?.uid, row?.blob_uid));
+        }
+        return result;
+    } catch (error) {
+        warn(`(X) failed to load existing asset_info keys: ${error.message}`);
+        return new Set();
+    }
+}
+
+function loadExistingImageKeys(db) {
+    try {
+        const rows = db.prepare('SELECT uid, blob_uid FROM "images"').all();
+        const result = new Set();
+        for (const row of rows) {
+            result.add(buildImageKey(row?.uid, row?.blob_uid));
+        }
+        return result;
+    } catch (error) {
+        warn(`(X) failed to load existing image keys: ${error.message}`);
+        return new Set();
+    }
+}
+
+function loadExistingVersionIds(db) {
+    try {
+        const rows = db.prepare('SELECT version_id FROM "versions"').all();
+        const set = new Set();
+        for (const row of rows) {
+            if (row?.version_id) {
+                set.add(row.version_id);
+            }
+        }
+        return set;
+    } catch (error) {
+        warn(`(X) failed to load existing versions: ${error.message}`);
+        return new Set();
+    }
+}
+
+function buildVersionRow(versionId, runDate, config, existingState) {
+    if (!versionId) {
+        return null;
+    }
+    const knownVersions = existingState?.versionIds ?? new Set();
+    if (knownVersions.has(versionId)) {
+        return null;
+    }
+    const createdAt = toIsoTimestamp(runDate);
+    const type = deriveVersionType(config, existingState);
+    const tags = normalizeVersionTags(config?.version_tags ?? config?.versionTags);
+    return {
+        version_id: versionId,
+        created_at: createdAt,
+        type,
+        tags
+    };
+}
+
+function toIsoTimestamp(value) {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return new Date().toISOString();
+    }
+    return date.toISOString();
+}
+
+function deriveVersionType(config, existingState) {
+    const fromConfig = normalizeVersionType(config?.version_type ?? config?.versionType);
+    if (fromConfig) {
+        return fromConfig;
+    }
+    const hasExisting = existingState?.versionIds && existingState.versionIds.size > 0;
+    if (!hasExisting) {
+        return 'daily';
+    }
+    return 'daily';
+}
+
+function normalizeVersionType(value) {
+    if (!value) {
+        return null;
+    }
+    const text = String(value).trim().toLowerCase();
+    if (VERSION_TYPE_VALUES.has(text)) {
+        return text;
+    }
+    return null;
+}
+
+function normalizeVersionTags(tags) {
+    if (!tags) {
+        return [];
+    }
+    const list = Array.isArray(tags) ? tags : String(tags).split(',');
+    const normalized = [];
+    for (const entry of list) {
+        const text = String(entry ?? '').trim();
+        if (!text) {
+            continue;
+        }
+        normalized.push(text);
+    }
+    return normalized;
 }
 
 function normalizeContentMap(documentContents) {
@@ -793,11 +1045,109 @@ function persistSimpleRows(db, tableName, columns, rows, options) {
     insertRows(db, tableName, columns, rows, options);
 }
 
-function persistAssetInfo(db, assets, assetsSchema, options) {
-    if (!assets.length) {
+function persistVersions(db, rows, versionsSchema, options) {
+    if (!rows.length) {
         return;
     }
-    const rows = assets.map((asset) => ({
+    const normalizedRows = rows.map((row) => normalizeTableRow(row, versionsSchema));
+    insertRows(db, 'versions', versionsSchema.insertColumns, normalizedRows, options);
+}
+
+function normalizeTableRow(row, tableSchema) {
+    const result = {};
+    for (const column of tableSchema.columns) {
+        if (column.autoIncrement) {
+            continue;
+        }
+        result[column.name] = formatColumnValue(column, row[column.name]);
+    }
+    return result;
+}
+
+function buildAssetInfoKey(uid, blobUid) {
+    const assetUid = uid === undefined || uid === null ? '' : String(uid);
+    const blob = blobUid === undefined || blobUid === null ? '' : String(blobUid);
+    return `${assetUid}|${blob}`;
+}
+
+function buildImageKey(uid, blobUid) {
+    const imageUid = uid === undefined || uid === null ? '' : String(uid);
+    const blob = blobUid === undefined || blobUid === null ? '' : String(blobUid);
+    return `${imageUid}|${blob}`;
+}
+
+function filterNewAssetInfoRows(assets, existingState) {
+    if (!assets?.length) {
+        return [];
+    }
+    const keys = existingState?.assetInfoKeys ?? new Set();
+    const rows = [];
+    for (const asset of assets) {
+        if (!asset?.uid) {
+            continue;
+        }
+        const key = buildAssetInfoKey(asset.uid, asset.blob_uid);
+        if (keys.has(key)) {
+            continue;
+        }
+        keys.add(key);
+        rows.push(asset);
+    }
+    return rows;
+}
+
+function filterNewBlobRows(blobs, existingState) {
+    if (!blobs?.length) {
+        return [];
+    }
+    const knownHashes = existingState?.knownBlobHashes ?? new Set();
+    const hashIndex = existingState?.blobHashIndex ?? new Map();
+    const rows = [];
+    for (const blob of blobs) {
+        const hash = blob?.hash;
+        if (!hash) {
+            continue;
+        }
+        if (knownHashes.has(hash)) {
+            const existing = hashIndex.get(hash);
+            if (existing && blob.blob_uid === undefined) {
+                blob.blob_uid = existing.blob_uid ?? blob.blob_uid ?? null;
+            }
+            continue;
+        }
+        knownHashes.add(hash);
+        hashIndex.set(hash, blob);
+        rows.push(blob);
+    }
+    return rows;
+}
+
+function filterNewImages(images, existingState) {
+    if (!images?.length) {
+        return [];
+    }
+    const keys = existingState?.imageKeys ?? new Set();
+    const rows = [];
+    for (const image of images) {
+        if (!image?.uid) {
+            continue;
+        }
+        const key = buildImageKey(image.uid, image.blob_uid);
+        if (keys.has(key)) {
+            continue;
+        }
+        keys.add(key);
+        rows.push(image);
+    }
+    return rows;
+}
+
+function persistAssetInfo(db, assets, assetsSchema, existingState, options) {
+    const filteredAssets = filterNewAssetInfoRows(assets, existingState);
+    if (!filteredAssets.length) {
+        return;
+    }
+    const rows = filteredAssets.map((asset) => ({
         uid: asset.uid,
         type: asset.type ?? null,
         blob_uid: asset.blob_uid ?? null,
@@ -812,11 +1162,12 @@ function persistAssetInfo(db, assets, assetsSchema, options) {
     insertRows(db, 'asset_info', assetsSchema.insertColumns, rows, options);
 }
 
-function persistBlobStore(db, blobs, blobsSchema, options) {
-    if (!blobs.length) {
+function persistBlobStore(db, blobs, blobsSchema, existingState, options) {
+    const filteredBlobs = filterNewBlobRows(blobs, existingState);
+    if (!filteredBlobs.length) {
         return;
     }
-    const rows = blobs.map((blob) => ({
+    const rows = filteredBlobs.map((blob) => ({
         blob_uid: blob.blob_uid ?? null,
         hash: blob.hash ?? null,
         size: blob.size ?? null,
@@ -829,12 +1180,14 @@ function persistBlobStore(db, blobs, blobsSchema, options) {
     insertRows(db, 'blob_store', blobsSchema.insertColumns, rows, options);
 }
 
-function persistImages(db, images, imagesSchema, options) {
-    if (!images.length) {
+function persistImages(db, images, imagesSchema, existingState, options) {
+    const filteredImages = filterNewImages(images, existingState);
+    if (!filteredImages.length) {
         return;
     }
-    const rows = images.map((image) => ({
+    const rows = filteredImages.map((image) => ({
         uid: image.uid ?? null,
+        blob_uid: image.blob_uid ?? null,
         type: image.type ?? null,
         name: image.name ?? null,
         extension: image.extension ?? null,

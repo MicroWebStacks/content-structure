@@ -5,8 +5,9 @@ datasets:
       - name: documents
         description: One row per source document with extracted metadata, relationships, and embedded content references. Additional document metadata fields are stored either as scalar columns or serialized *_list columns as needed.
         columns:
+          - { name: id, type: int, primary: true, autoincrement: true, description: Autoincrement row id for the versioned document }
           - { name: version_id, type: string, description: Encoded seconds-since-2000 identifier for the collection run that produced the row }
-          - { name: sid, type: string, primary: true, description: Stable short hash for the document }
+          - { name: sid, type: string, description: Stable short hash for the document }
           - { name: uid, type: string, description: Human-friendly identifier derived from the file path or slug }
           - { name: path, type: string, description: Relative source path inside the content tree }
           - { name: url, type: string, description: Public route exposed for the document }
@@ -23,6 +24,7 @@ datasets:
       - name: items
         description: Flattened AST items representing headings, paragraphs, and asset-backed nodes in reading order.
         columns:
+          - { name: id, type: int, primary: true, autoincrement: true, description: Autoincrement row id for the versioned item }
           - { name: version_id, type: string, description: Encoded seconds-since-2000 identifier for the collection run }
           - { name: doc_sid, type: string, description: SID of the parent document }
           - { name: slug, type: string, description: Page-unique slug usable as intra-page anchor }
@@ -35,15 +37,17 @@ datasets:
       - name: assets
         description: Version-specific rows that connect each document asset to the collection run for downstream joins.
         columns:
+          - { name: id, type: int, primary: true, autoincrement: true, description: Autoincrement row id for the versioned asset }
           - { name: version_id, type: string, description: Encoded seconds-since-2000 identifier for the collection run }
           - { name: doc_sid, type: string, description: SID of the document that owns the item }
-          - { name: asset_uid, type: string, primary: true, description: UID of the referenced asset as stored in the asset_info table }
+          - { name: asset_uid, type: string, description: UID of the referenced asset as stored in the asset_info table }
           - { name: blob_uid, type: string, description: UID of the blob row referenced by this asset }
           - { name: type, type: string, description: Asset type recorded for this version (mirrors asset_info.type) }
       - name: asset_info
         description: Asset catalog linking documents to their concrete payloads via blob hashes derived from code blocks, tables, image references, and loose files.
         columns:
-          - { name: uid, type: string, primary: true, description: Stable identifier composed from the document uid and asset slug }
+          - { name: id, type: int, primary: true, autoincrement: true, description: Autoincrement row id for the asset catalog }
+          - { name: uid, type: string, description: Stable identifier composed from the document uid and asset slug }
           - { name: type, type: string, values: [file, codeblock, table, model, image, linked_file, gallery_asset, found], description: Asset type such as codeblock, table, file, or model }
           - { name: blob_uid, type: string, description: UID joining to the blob_store table entry }
           - { name: parent_doc_uid, type: string, description: UID of the document that introduced the asset }
@@ -66,10 +70,19 @@ datasets:
       - name: images
         description: Image metadata derived from on-disk files for image and gallery assets.
         columns:
-          - { name: uid, type: string, primary: true, description: UID of the backing asset (image or gallery_asset) }
+          - { name: id, type: int, primary: true, autoincrement: true, description: Autoincrement row id for the image metadata }
+          - { name: uid, type: string, description: UID of the backing asset (image or gallery_asset) }
+          - { name: blob_uid, type: string, description: UID of the blob backing this image when available }
           - { name: type, type: string, description: Asset type used when the image was extracted }
           - { name: name, type: string, description: Filename without extension derived from the asset path }
           - { name: extension, type: string, description: File extension for the image }
           - { name: width, type: int, description: Pixel width after orientation correction }
           - { name: height, type: int, description: Pixel height after orientation correction }
           - { name: ratio, type: string, description: Aspect ratio width/height as a decimal string }
+      - name: versions
+        description: One row per collection run to track version metadata.
+        columns:
+          - { name: version_id, type: string, primary: true, description: Encoded seconds-since-2000 identifier for the collection run }
+          - { name: created_at, type: string, description: ISO timestamp of when the version was produced }
+          - { name: type, type: string, values: [daily, weekly, monthly, early, baseline], description: Run cadence classification }
+          - { name: tags, type: string_list, description: Free-form tags associated with the version }

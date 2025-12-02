@@ -34,12 +34,14 @@ async function collect(config){
         return
     }
 
+    const existingState = writer.existingState ?? {}
     const assetIndex = Object.create(null)
     const documentIndex = Object.create(null)
     const blobManager = createBlobManager(runTimestamp)
-    const blobState = createBlobState()
+    const blobState = createBlobState(existingState.blobHashIndex, existingState.maxBlobUid, existingState.knownBlobHashes)
     const orderTracker = createDocumentOrderTracker()
     const imageCatalog = createImageCatalog()
+    const existingImageKeys = existingState.imageKeys ?? new Set()
 
     const originalCwd = process.cwd()
     try{
@@ -67,17 +69,18 @@ async function collect(config){
             await ensureFrontmatterImageAsset(entry, content, assetList)
 
             await annotateAssets(assetList,config)
-            await collectImageMetadata(assetList, imageCatalog)
-            stampAssets(assetList, runTimestamp)
             await attachBlobsToAssets(assetList, blobManager, blobState, runTimestamp)
+            await collectImageMetadata(assetList, imageCatalog, existingImageKeys)
+            stampAssets(assetList, runTimestamp)
             writer.insertDocument(entry,content,tree,assetList)
             if(assetList.length > 0){
                 writer.insertAssets(assetList)
                 addAssetsToIndex(assetIndex,assetList)
             }
         }
-        if(blobState.catalog.size > 0){
-            writer.insertBlobs(Array.from(blobState.catalog.values()))
+        const newBlobRows = Array.from(blobState.newHashes ?? []).map((hash)=>blobState.catalog.get(hash)).filter(Boolean)
+        if(newBlobRows.length > 0){
+            writer.insertBlobs(newBlobRows)
         }
         if(imageCatalog.size > 0){
             writer.insertImages(Array.from(imageCatalog.values()))
@@ -86,6 +89,7 @@ async function collect(config){
         process.chdir(originalCwd)
     }
 
+    return versionId
 }
 
 async function annotateAssets(assets,config){
@@ -197,10 +201,26 @@ async function attachBlobsToAssets(assets,blobManager,blobState,timestamp){
     }
 }
 
-function createBlobState(){
+function createBlobState(existingMap = new Map(), initialCounter = 0, existingHashes = new Set()){
+    const catalog = new Map()
+    const knownHashes = new Set(existingHashes ?? [])
+    let counter = Number.isFinite(initialCounter) ? initialCounter : 0
+    if(existingMap && typeof existingMap[Symbol.iterator] === 'function'){
+        for(const [hash, entry] of existingMap.entries()){
+            const cloned = {...entry}
+            catalog.set(hash,cloned)
+            knownHashes.add(hash)
+            const numericId = parseBlobUid(entry?.blob_uid)
+            if(Number.isFinite(numericId) && numericId > counter){
+                counter = numericId
+            }
+        }
+    }
     return {
-        catalog:new Map(),
-        counter:0
+        catalog,
+        knownHashes,
+        newHashes:new Set(),
+        counter
     }
 }
 
@@ -208,13 +228,17 @@ function registerBlob(blobState,data,timestamp){
     if(!blobState || !data || !data.hash){
         return null
     }
-    const {catalog} = blobState
+    const {catalog, knownHashes, newHashes} = blobState
     let entry = catalog.get(data.hash)
     if(!entry){
         blobState.counter += 1
         entry = {
             blob_uid: blobState.counter.toString(16),
             hash:data.hash
+        }
+        catalog.set(data.hash,entry)
+        if(newHashes){
+            newHashes.add(data.hash)
         }
     }
     if(Number.isFinite(data.size)){
@@ -241,8 +265,26 @@ function registerBlob(blobState,data,timestamp){
         }
         entry.last_seen = timestamp
     }
-    catalog.set(data.hash,entry)
+    if(knownHashes){
+        knownHashes.add(data.hash)
+    }
     return entry
+}
+
+function parseBlobUid(blobUid){
+    if(blobUid === null || blobUid === undefined){
+        return 0
+    }
+    const text = String(blobUid)
+    const hex = parseInt(text,16)
+    if(Number.isFinite(hex) && hex >= 0){
+        return hex
+    }
+    const decimal = parseInt(text,10)
+    if(Number.isFinite(decimal) && decimal >= 0){
+        return decimal
+    }
+    return 0
 }
 
 function createDocumentOrderTracker(){
@@ -421,7 +463,13 @@ function createImageCatalog(){
     return new Map()
 }
 
-async function collectImageMetadata(assets, imageCatalog){
+function buildImageKey(uid, blobUid){
+    const imageUid = uid === undefined || uid === null ? '' : String(uid)
+    const blob = blobUid === undefined || blobUid === null ? '' : String(blobUid)
+    return `${imageUid}|${blob}`
+}
+
+async function collectImageMetadata(assets, imageCatalog, existingImageKeys = new Set()){
     for(const asset of assets){
         if(!asset || !asset.uid){
             continue
@@ -429,7 +477,11 @@ async function collectImageMetadata(assets, imageCatalog){
         if(asset.type !== 'image' && asset.type !== 'gallery_asset'){
             continue
         }
-        if(imageCatalog.has(asset.uid)){
+        const key = buildImageKey(asset.uid, asset.blob_uid)
+        if(existingImageKeys && existingImageKeys.has(key)){
+            continue
+        }
+        if(imageCatalog.has(key)){
             continue
         }
         const absPath = asset.abs_path ?? null
@@ -461,8 +513,9 @@ async function collectImageMetadata(assets, imageCatalog){
         const ratio = width / height
         const extension = deriveImageExtension(asset)
         const name = deriveImageName(asset)
-        imageCatalog.set(asset.uid,{
+        imageCatalog.set(key,{
             uid:asset.uid,
+            blob_uid:asset.blob_uid ?? null,
             type:asset.type ?? null,
             name:name ?? null,
             extension:extension ?? null,

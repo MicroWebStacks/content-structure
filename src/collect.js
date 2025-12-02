@@ -76,7 +76,10 @@ async function getKnownEntryFieldSet(){
 async function loadKnownEntryFieldSet(){
     const schema = await getStructureSchema()
     const documentsTable = schema?.tables?.get(DOCUMENTS_TABLE_NAME)
-    const columnNames = (documentsTable?.columns ?? []).map(column => column.name).filter(Boolean)
+    const columnNames = (documentsTable?.columns ?? [])
+        .filter(column => !column.autoIncrement)
+        .map(column => column.name)
+        .filter(Boolean)
     return new Set(columnNames)
 }
   
