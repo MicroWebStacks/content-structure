@@ -6,7 +6,6 @@ import { openDatabase, ensureTable, insertRows, runInTransaction, ensureColumn }
 import { computeVersionId } from './version_id.js';
 import { node_text, title_slug } from './md_utils.js';
 
-const DB_FILENAME = 'structure.db';
 const CATALOG_PATH = 'catalog.yaml';
 const STRUCTURE_DATASET_NAME = 'structure';
 const LIST_COLUMN_TYPES = new Set(['string_list', 'object_list']);
@@ -101,15 +100,14 @@ function requireTableSchema(schema, tableName) {
 async function createStructureDbWriter(options = {}) {
     const config = get_config();
     await check_dir_create('');
-    const dbPath = join(config.outdir, DB_FILENAME);
     const schema = await getStructureSchema();
     const versionId = options?.versionId ?? computeVersionId();
     const runDate = options?.runDate ?? new Date();
     let db;
     try {
-        db = openDatabase(dbPath);
+        db = openDatabase(config.db_path);
     } catch (error) {
-        warn(`(!) skipping structure.db generation: ${error.message}`);
+        warn(`(!) skipping ${config.db_path} generation: ${error.message}`);
         return null;
     }
     const documentsSchema = requireTableSchema(schema, 'documents');
