@@ -9,13 +9,15 @@ import { getStructureSchema } from './structure_db.js'
 
 let config = {
     rootdir: process.cwd(),
-    contentdir: "content",
-    outdir: ".structure",
+    contentdir: join(process.cwd(), "content"),
+    outdir: join(process.cwd(), ".structure"),
     debug:false,
     folder_single_doc:false,
     external_storage_kb: 512,
     inline_compression_kb: 32,
-    file_compress_ext: ['txt','md','json','csv','tsv','yaml','yml']
+    file_compress_ext: ['txt','md','json','csv','tsv','yaml','yml'],
+    file_link_ext: ["svg","webp","png","jpeg","jpg","xlsx","glb"],
+    db_path: join(process.cwd(),".structure","structure.db"),
 }
 
 const DOCUMENTS_TABLE_NAME = 'documents'

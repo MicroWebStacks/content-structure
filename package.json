@@ -4,6 +4,9 @@
   "version": "2.1.0",
   "description": "Stores parsed markdown in SQLite tables that can be used for rendering and database content management.",
   "main": "index.js",
+  "bin": {
+    "content-structure": "cli.js"
+  },
   "scripts": {
     "demo": "pnpm --filter content-structure-example demo"
   },
