@@ -85,3 +85,16 @@ the config parameter is optional and do have default values
 * `.structure/structure.db` : a SQLite database (powered by better-sqlite3).
   The database exposes the tables `documents`, `items`, `assets`, `asset_info`, and `blob_store`.
 * `blobs/year/month/prefix/hash` path for all files larger than `config.external_storage_kb`
+
+
+# Publish how to
+
+```bash
+git tag v2.2.1 && git push origin v2.2.1
+```
+
+delete tags
+```bash
+git push origin :refs/tags/v2.2.0
+git tag -d v2.2.0
+```
