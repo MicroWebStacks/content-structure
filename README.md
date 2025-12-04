@@ -1,7 +1,13 @@
 # Content Structure
 Parsed markdown is stored in SQLite tables that can be used for rendering and database content management.
 
-![design](design.drawio.svg)
+![overview](./docs/overview.drawio.svg)
+
+The overview diagram above shows the main `content-structure` operations (AST parsing and assets collection in sqlite DB) and shows an example ussage of the resulting dataset which is web framework agnostic.
+
+![design](./docs/design.drawio.svg)
+
+A more detailed flow with focus on versioned and non versionned tables.
 
 ## Deepwiki
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/MicroWebStacks/content-structure)
