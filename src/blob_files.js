@@ -18,10 +18,18 @@ function normalizeExt(ext) {
     return value.startsWith('.') ? value.slice(1) : value;
 }
 
-// Content-addressed file name: <hash>.<ext>, or the bare hash when ext is empty.
+const BLOB_FILE_HASH_LENGTH = 12;
+
+function shortenBlobHash(hash) {
+    const value = String(hash ?? '');
+    return value.length > BLOB_FILE_HASH_LENGTH ? value.slice(0, BLOB_FILE_HASH_LENGTH) : value;
+}
+
+// Content-addressed file name: <hash-prefix>.<ext>, or the bare prefix when ext is empty.
 function blobFileName(hash, ext) {
     const normalized = normalizeExt(ext);
-    return normalized ? `${hash}.${normalized}` : String(hash);
+    const visibleHash = shortenBlobHash(hash);
+    return normalized ? `${visibleHash}.${normalized}` : visibleHash;
 }
 
 // Resolve the decompressed bytes for a blob row, either from an inline payload
@@ -83,7 +91,9 @@ async function writeBlobFiles(refs, blobsDir, outdir) {
 }
 
 export {
+    BLOB_FILE_HASH_LENGTH,
     normalizeExt,
+    shortenBlobHash,
     blobFileName,
     resolveBlobBytes,
     writeBlobFiles
