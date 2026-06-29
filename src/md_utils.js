@@ -265,6 +265,11 @@ async function walkDocumentTree(tree, entry){
             case 'link':
                 await createLinkEntry(node, state)
                 break
+            case 'textDirective':
+                if(node.name === 'image'){
+                    await createImageDirectiveEntry(node, state)
+                }
+                break
             default:
                 break
         }
@@ -424,6 +429,27 @@ async function createImageEntry(node, state){
         state.assets.push(asset)
     }
     state.images.push(imageEntry)
+    return imageEntry
+}
+
+// Inline image directive `:image[]{src=... alt=... height=... center}`.
+// Treated as a regular image so it flows through the same asset/render
+// pipeline; display options (height/width/center) ride along on the entry.
+async function createImageDirectiveEntry(node, state){
+    const attrs = (node && node.attributes && typeof node.attributes === 'object') ? node.attributes : {}
+    const syntheticImage = {
+        type:'image',
+        url: typeof attrs.src === 'string' ? attrs.src : '',
+        title: attrs.title ?? null,
+        alt: attrs.alt ?? null
+    }
+    const entry = await createImageEntry(syntheticImage, state)
+    entry.options = {
+        height: attrs.height ?? null,
+        width: attrs.width ?? null,
+        center: ('center' in attrs)
+    }
+    return entry
 }
 
 async function buildImageAsset(node, state, imageEntry, extRaw){

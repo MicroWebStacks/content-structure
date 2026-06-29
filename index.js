@@ -1,11 +1,27 @@
 import { join, dirname, parse } from 'path'
-import sharp from 'sharp';
 import { exists, exists_public, file_ext, exists_abs } from './src/utils.js';
 import {iterate_documents, set_config, tree_content, shortMD5} from './src/collect.js'
 import { debug, warn } from './src/libs/log.js';
 import { createStructureDbWriter } from './src/structure_db.js';
+import { createStructureJsonWriter } from './src/structure_json.js';
 import { createBlobManager } from './src/blob_manager.js';
 import { computeVersionId } from './src/version_id.js';
+
+// sharp is loaded lazily and treated as optional: the JSON ("lite") profile
+// runs without it (image intrinsic dimensions are simply skipped). The SQLite
+// profile uses it when present for width/height/orientation.
+let sharpModule;
+async function getSharp() {
+    if (sharpModule === undefined) {
+        try {
+            sharpModule = (await import('sharp')).default;
+        } catch (error) {
+            sharpModule = null;
+            warn(`(!) sharp unavailable; image dimensions will be skipped: ${error.message}`);
+        }
+    }
+    return sharpModule;
+}
 
 function decodePathValue(pathValue){
     if(!pathValue){
@@ -29,7 +45,10 @@ async function collect(config){
     const runDate = new Date()
     const runTimestamp = runDate.toISOString()
     const versionId = computeVersionId(runDate)
-    const writer = await createStructureDbWriter({versionId})
+    const useJson = String(config?.format ?? 'sqlite').toLowerCase() === 'json'
+    const writer = useJson
+        ? await createStructureJsonWriter({versionId})
+        : await createStructureDbWriter({versionId})
     if(!writer){
         return
     }
@@ -87,6 +106,10 @@ async function collect(config){
         }
     }finally{
         process.chdir(originalCwd)
+    }
+
+    if(typeof writer.finalize === 'function'){
+        await writer.finalize()
     }
 
     return versionId
@@ -490,6 +513,10 @@ async function collectImageMetadata(assets, imageCatalog, existingImageKeys = ne
         }
         const existsOnDisk = await exists_abs(absPath)
         if(!existsOnDisk){
+            continue
+        }
+        const sharp = await getSharp()
+        if(!sharp){
             continue
         }
         let metadata

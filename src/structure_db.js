@@ -1,10 +1,22 @@
 import { join } from 'path';
+import { mkdir } from 'fs/promises';
 import { check_dir_create, load_yaml_code } from './utils.js';
+import { writeBlobFiles } from './blob_files.js';
 import { get_config, shortMD5 } from './collect.js';
 import { warn } from './libs/log.js';
-import { openDatabase, ensureTable, insertRows, runInTransaction, ensureColumn } from './sqlite_utils/index.js';
 import { computeVersionId } from './version_id.js';
-import { node_text, title_slug } from './md_utils.js';
+import { node_text, node_text_list, title_slug } from './md_utils.js';
+
+// SQLite helpers are loaded lazily (only when the SQLite writer is actually
+// constructed) so that consumers importing the pure row-builders below — e.g.
+// the JSON writer — never pull in better-sqlite3.
+let openDatabase, ensureTable, insertRows, runInTransaction, ensureColumn;
+async function ensureSqliteLoaded() {
+    if (!openDatabase) {
+        ({ openDatabase, ensureTable, insertRows, runInTransaction, ensureColumn } =
+            await import('./sqlite_utils/index.js'));
+    }
+}
 
 const CATALOG_PATH = 'catalog.yaml';
 const STRUCTURE_DATASET_NAME = 'structure';
@@ -98,6 +110,7 @@ function requireTableSchema(schema, tableName) {
 }
 
 async function createStructureDbWriter(options = {}) {
+    await ensureSqliteLoaded();
     const config = get_config();
     await check_dir_create('');
     const schema = await getStructureSchema();
@@ -155,6 +168,29 @@ async function createStructureDbWriter(options = {}) {
         },
         insertImages(imagesList = []) {
             persistImages(db, imagesList, imagesSchema, existingState);
+        },
+        // Materialize content-addressed <hash>.<ext> static files for every
+        // asset/image blob in the store, so assets can be served as immutable,
+        // browser-cacheable files. Spans all versions present in the DB.
+        async finalize() {
+            const blobsDir = join(config.outdir, 'blobs');
+            await mkdir(blobsDir, {recursive: true});
+            const assetRows = db.prepare(`
+                SELECT ai.ext AS ext, bs.hash AS hash, bs.path AS path, bs.payload AS payload, bs.compression AS compression
+                FROM asset_info ai JOIN blob_store bs ON ai.blob_uid = bs.blob_uid
+                WHERE bs.hash IS NOT NULL AND ai.blob_uid IS NOT NULL
+            `).all();
+            const imageRows = db.prepare(`
+                SELECT im.extension AS ext, bs.hash AS hash, bs.path AS path, bs.payload AS payload, bs.compression AS compression
+                FROM images im JOIN blob_store bs ON im.blob_uid = bs.blob_uid
+                WHERE bs.hash IS NOT NULL AND im.blob_uid IS NOT NULL
+            `).all();
+            const refs = [...assetRows, ...imageRows].map((row) => ({
+                blob: {hash: row.hash, path: row.path, payload: row.payload, compression: row.compression},
+                ext: row.ext
+            }));
+            const {count, missing} = await writeBlobFiles(refs, blobsDir, config.outdir);
+            console.log(`structure-db(sqlite): materialized ${count} blob file(s)${missing ? ` (missing=${missing})` : ''} -> ${blobsDir}`);
         }
     };
 }
@@ -648,7 +684,11 @@ function buildItemRows(doc, content, options = {}) {
                 handleLink(node);
                 return;
             case 'textDirective':
-                handleTextDirective(node);
+                if (node.name === 'image') {
+                    handleImage(node);
+                } else {
+                    handleTextDirective(node);
+                }
                 return;
             case 'containerDirective':
                 handleContainerDirective(node);
@@ -688,7 +728,8 @@ function buildItemRows(doc, content, options = {}) {
                     text: fallbackText,
                     level,
                     node,
-                    slug
+                    slug,
+                    ast: serializeAstNode(node)
                 });
             }
             return;
@@ -697,12 +738,20 @@ function buildItemRows(doc, content, options = {}) {
                 if (segment.type === 'text') {
                     if (segment.value) {
                         const slug = buildParagraphSlug();
+                        const segNode = segment.node ?? node;
+                        // A lone text segment is a whole paragraph → force its AST
+                        // so it renders as a block <p> and consecutive plain
+                        // paragraphs separate. Text segments that share a paragraph
+                        // with links/images stay inline (ast left to the default
+                        // rule: block only when they carry inline formatting).
+                        const ast = segments.length === 1 ? serializeAstNode(segNode) : undefined;
                         pushRow({
                             type: 'paragraph',
                             text: segment.value,
                             level,
-                            node: segment.node ?? node,
-                            slug
+                            node: segNode,
+                            slug,
+                            ast
                         });
                     }
                     return;
@@ -728,6 +777,18 @@ function buildItemRows(doc, content, options = {}) {
                         }
                         return;
             }
+                if (segment.type === 'textDirective') {
+                    // Image directives flow through the image pipeline (so they
+                    // render like any other image); other directives go to the
+                    // directive renderer. Keyed on name so build pass 1 and 2 stay
+                    // aligned on the shared image cursor.
+                    if (segment.node?.name === 'image') {
+                        handleImage(segment.node, level, line);
+                    } else {
+                        handleTextDirective(segment.node, level, line);
+                    }
+                    return;
+                }
         });
     }
 
@@ -800,13 +861,25 @@ function buildItemRows(doc, content, options = {}) {
         const assetSlug = extractAssetSlug(imageEntry.uid);
         const assetUid = recordSingleAsset(imageEntry.uid, 'inline_image');
         const text = label;
+        // Image directives carry display options (height/width/center); plain
+        // images don't, so the ast stays null and their behaviour is unchanged.
+        let astPayload;
+        if (imageEntry.options) {
+            try {
+                astPayload = JSON.stringify({options: imageEntry.options});
+            } catch (error) {
+                warn(`(X) failed to serialize image directive options: ${error.message}`);
+                astPayload = null;
+            }
+        }
         pushRow({
             type: 'image',
             text,
             level,
             node,
             slug: assetSlug,
-            assetUid
+            assetUid,
+            ast: astPayload
         });
     }
 
@@ -847,9 +920,9 @@ function buildItemRows(doc, content, options = {}) {
         return attributes;
     }
 
-    function handleTextDirective(node) {
-        const line = getNodeLine(node);
-        const level = getLevelForLine(line);
+    function handleTextDirective(node, levelOverride, lineOverride) {
+        const line = lineOverride ?? getNodeLine(node);
+        const level = typeof levelOverride === 'number' ? levelOverride : getLevelForLine(line);
         const attributes = extractDirectiveAttributes(node);
         let astPayload = null;
         const payload = {name:node.name,attributes};
@@ -914,11 +987,18 @@ function buildItemRows(doc, content, options = {}) {
             const synthetic = {type: 'paragraph', children};
             const text = node_text(synthetic);
             if (text && text.trim()) {
-                segments.push({type: 'text', value: text, node: synthetic});
+                // Preserve a single boundary space where this text run touched
+                // an adjacent inline link/image, so "word [link]" renders as
+                // "word link" and not "wordlink". Internal spacing stays
+                // normalized, so standalone paragraphs are unchanged.
+                const raw = node_text_list(synthetic).join('');
+                const lead = /^\s/.test(raw) ? ' ' : '';
+                const trail = /\s$/.test(raw) ? ' ' : '';
+                segments.push({type: 'text', value: lead + text + trail, node: synthetic});
             }
         }
         for (const child of node.children) {
-            if (child.type === 'image' || child.type === 'link') {
+            if (child.type === 'image' || child.type === 'link' || child.type === 'textDirective') {
                 flushBuffer();
                 segments.push({type: child.type, node: child});
             } else {
@@ -1275,5 +1355,6 @@ function normalizeScalar(value) {
 export {
     writeStructureDb,
     createStructureDbWriter,
-    getStructureSchema
+    getStructureSchema,
+    buildDocumentRow
 };
