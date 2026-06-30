@@ -96,11 +96,11 @@ the config parameter is optional and do have default values
 # Publish how to
 
 ```bash
-git tag v2.2.1 && git push origin v2.2.1
+git tag v2.2.3 && git push origin v2.2.3
 ```
 
 delete tags
 ```bash
-git push origin :refs/tags/v2.2.0
-git tag -d v2.2.0
+git push origin :refs/tags/v2.2.3
+git tag -d v2.2.3
 ```
